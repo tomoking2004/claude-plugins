@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "refine",
+  "version": "0.1.0",
+  "description": "美の基準（BEAUTY.md）を定義し，成果物を媒体ごとに最も美しい確定版へ仕上げるスキル群．",
+  "author": {
+    "name": "tomoking2004"
+  },
+  "repository": "https://github.com/tomoking2004/claude-plugins",
+  "license": "MIT",
+  "keywords": ["claude-code", "skills", "refine", "beauty"],
+  "dependencies": ["doctor"]
+}
