@@ -1,0 +1,4 @@
+.claude/*
+!.claude/settings.json
+!.claude/sync-junctions.ps1
+.local/
