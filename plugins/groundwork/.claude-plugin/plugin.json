@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "groundwork",
+  "version": "0.1.0",
+  "description": "文脈（.claude/context.md）を単一の真実として，プロジェクトの構想を進める工程スキル群．",
+  "author": {
+    "name": "tomoking2004"
+  },
+  "repository": "https://github.com/tomoking2004/claude-plugins",
+  "license": "MIT",
+  "keywords": ["claude-code", "skills", "context-driven", "workflow", "design"],
+  "dependencies": ["doctor"]
+}
