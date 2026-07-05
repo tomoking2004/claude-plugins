@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "tomoking2004",
+  "description": "全てを一つの美の基準で貫く Claude Code プラグイン群．",
+  "owner": {
+    "name": "tomoking2004"
+  },
+  "plugins": [
+    { "name": "groundwork", "source": "./plugins/groundwork" },
+    { "name": "refine", "source": "./plugins/refine" },
+    { "name": "project", "source": "./plugins/project" },
+    { "name": "doctor", "source": "./plugins/doctor" }
+  ]
+}
