@@ -9,5 +9,5 @@
   "repository": "https://github.com/tomoking2004/claude-plugins",
   "license": "MIT",
   "keywords": ["claude-code", "skills", "context-driven", "workflow", "design"],
-  "dependencies": ["doctor"]
+  "dependencies": ["heal"]
 }
