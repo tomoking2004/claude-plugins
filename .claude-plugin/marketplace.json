@@ -8,7 +8,9 @@
   "plugins": [
     { "name": "groundwork", "source": "./plugins/groundwork" },
     { "name": "refine", "source": "./plugins/refine" },
-    { "name": "project", "source": "./plugins/project" },
-    { "name": "doctor", "source": "./plugins/doctor" }
+    { "name": "capstone", "source": "./plugins/capstone" },
+    { "name": "assignment", "source": "./plugins/assignment" },
+    { "name": "ops", "source": "./plugins/ops" },
+    { "name": "heal", "source": "./plugins/heal" }
   ]
 }
