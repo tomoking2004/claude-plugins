@@ -1,13 +1,13 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
-  "name": "project",
+  "name": "capstone",
   "version": "0.1.0",
-  "description": "プロジェクトを完成へ運ぶ工程スキル群．",
+  "description": "仕上げ・記録・公開を通じて，プロジェクトを完成という頂へ載せきる工程スキル群．",
   "author": {
     "name": "tomoking2004"
   },
   "repository": "https://github.com/tomoking2004/claude-plugins",
   "license": "MIT",
   "keywords": ["claude-code", "skills", "workflow", "lifecycle"],
-  "dependencies": ["refine", "doctor"]
+  "dependencies": ["refine", "heal"]
 }

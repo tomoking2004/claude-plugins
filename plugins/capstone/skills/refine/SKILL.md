@@ -22,4 +22,4 @@ description: プロジェクト全体（または指定範囲）を最も美し�
 
 ## 失敗時
 
-/doctor:skill を呼ぶ．
+/heal:skill を呼ぶ．
