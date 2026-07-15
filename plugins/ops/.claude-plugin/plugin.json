@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "ops",
+  "version": "0.1.0",
+  "description": "長時間走るプログラムの実行時運用（起動・監視・状況照会・完了報告）を担うスキル群．",
+  "author": {
+    "name": "tomoking2004"
+  },
+  "repository": "https://github.com/tomoking2004/claude-plugins",
+  "license": "MIT",
+  "keywords": ["claude-code", "skills", "background-execution", "monitoring"],
+  "dependencies": ["heal"]
+}
