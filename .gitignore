@@ -2,3 +2,4 @@
 !.claude/settings.json
 !.claude/sync-junctions.ps1
 .local/
+__pycache__/
