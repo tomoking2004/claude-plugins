@@ -23,4 +23,4 @@ description: コード（スクリプト・設定含む）を美の基準で走�
 
 ## 失敗時
 
-/doctor:skill を呼ぶ．
+/heal:skill を呼ぶ．
