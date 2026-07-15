@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "assignment",
+  "version": "0.1.0",
+  "description": "大学の課題を出題文・採点基準に照らして過不足なく仕上げるスキル群．",
+  "author": {
+    "name": "tomoking2004"
+  },
+  "repository": "https://github.com/tomoking2004/claude-plugins",
+  "license": "MIT",
+  "keywords": ["claude-code", "skills", "assignment", "coursework"],
+  "dependencies": ["refine", "heal"]
+}
