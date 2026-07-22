@@ -26,7 +26,7 @@ Claude Code プラグインのマーケットプレイス．全てを一つの�
 | refine | 媒体 | /refine:code ・ /refine:docs |
 | capstone | 完成の工程 | /capstone:refine → /capstone:commit → /capstone:release |
 | assignment | 課題の媒体 | /assignment:complete → /assignment:report ・ /assignment:program |
-| ops | 実行の局面 | /ops:exec ・ /ops:progress |
+| ops | 運用の局面 | /ops:exec ・ /ops:progress ・ /ops:clean |
 | heal | 治療の対象 | /heal:skill |
 
 ## 導入
@@ -45,7 +45,7 @@ capstone と assignment は美の仕上げを refine のスキルへ委譲する
 
 ## 使い方
 
-/groundwork:survey で文脈を確立し，/groundwork:theory で方針を固め，/groundwork:impl で実装との整合を走査する．大学の課題は /assignment:complete が出題文から仕上げまで運ぶ——単一媒体なら report・program のスキルを直接使う．仕上げは /capstone:refine——範囲を媒体に分解し /refine:code ・ /refine:docs へ委譲する；単一媒体なら refine のスキルを直接使う．記録は /capstone:commit，公開は /capstone:release．数十秒を超えて走るプログラム（学習・評価・サーバ等）は，明示の指定がなくても /ops:exec が起動から完了報告までを担い，走っているものの様子は /ops:progress が答える——数十秒で終わる実行（テスト・ビルド等）は素のまま走らせる．スキルが失敗したら /heal:skill が定義を更新し再発を防ぐ．
+/groundwork:survey で文脈を確立し，/groundwork:theory で方針を固め，/groundwork:impl で実装との整合を走査する．大学の課題は /assignment:complete が出題文から仕上げまで運ぶ——単一媒体なら report・program のスキルを直接使う．仕上げは /capstone:refine——範囲を媒体に分解し /refine:code ・ /refine:docs へ委譲する；単一媒体なら refine のスキルを直接使う．記録は /capstone:commit，公開は /capstone:release．数十秒を超えて走るプログラム（学習・評価・サーバ等）は，明示の指定がなくても /ops:exec が起動から完了報告までを担い，走っているものの様子は /ops:progress が答える——数十秒で終わる実行（テスト・ビルド等）は素のまま走らせる．このマシンに溜まった Claude Code の履歴・痕跡は /ops:clean が，何を消すか列挙して承認を得たうえで掃除する——ログイン・設定・導入済みプラグインは残す．スキルが失敗したら /heal:skill が定義を更新し再発を防ぐ．
 
 ## 開発
 
