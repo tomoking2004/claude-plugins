@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "capstone",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "仕上げ・記録・公開を通じて，プロジェクトを完成という頂へ載せきる工程スキル群．",
   "author": {
     "name": "tomoking2004"
