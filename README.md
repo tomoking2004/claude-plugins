@@ -4,7 +4,7 @@ Claude Code プラグインのマーケットプレイス．全てを一つの�
 
 ## なぜ
 
-- **確定版＝不動点**：refine は走査がゼロを返すまで磨いて確定する——再適用しても変わらない，検証できる完成．
+- **確定版＝不動点**：refine は走査がゼロを返すまで磨いて確定する——不動点は目指す先で，機械に載る分は再実行可能な検査（[scripts/scan.py](scripts/scan.py)）が保証する．
 - **一つの基準が全媒体を貫く**：コード・文書・コミットが同じ美の6条で仕上がる．
 - **知能を償却する**：日々の仕上げにトップ級の知能は要らない．
 - **完璧が自己進化する**：基準そのものが磨かれ，良くなった分は以後の全てに効く．
@@ -54,7 +54,7 @@ capstone と assignment は美の仕上げを refine のスキルへ委譲する
 - 各プラグインは独立した SemVer 単位——ユーザーはプラグインを個別に導入するため，バージョンは変更のあったプラグインだけが上がる（lockstep にしない）．リリースは /capstone:release がプラグインごとに判定し，`<plugin>-vX.Y.Z` 形式のタグと GitHub Release を個別に発行する．
 - スキル名は組み込みコマンド名（/context ・ /review ・ /init ・ /status 等）と一致させず，プラグインをまたいでも重複させない——素の名前はマーケットプレイス全体で一意に保つ．VS Code 拡張は名前空間付き呼び出しをコマンドとして認識せず素の名前で解決するため，組み込みと衝突するスキルは呼び出せなくなり，スキル同士が重複すればどちらが出るか定まらない．
 - 本リポジトリの不変条件は [scripts/scan.py](scripts/scan.py) が走査する——マニフェストとディレクトリ構成の一致，SemVer，`dependencies` の実在，SKILL.md の frontmatter，素の名前の一意性，相対リンクの実在と境界，そして動的コンテキストが全 git 状態で exit 0 かつ非空の出力を返すこと（規律そのものは /refine:docs の「媒体の正典」が定める）．`python scripts/scan.py` で走り，違反ゼロなら exit 0；[CI](.github/workflows/scan.yml) が push・PR ごとにこれを確定の根拠にする．BEAUTY.md の「ゼロ確認」を，印象でなく再実行可能な検査として持つための道具であり，走査で捉えられる観点が増えたらここに足す．
-- 美の基準は [plugins/refine/BEAUTY.md](plugins/refine/BEAUTY.md) が唯一の定義元．実行時に適用するスキルはその場でこれを読み，他の全スキル・全成果物は設計時に自らの媒体へ具体化して従う．
+- 美の基準は [plugins/refine/BEAUTY.md](plugins/refine/BEAUTY.md) が唯一の定義元．実行時に適用するスキルはその場でこれを読む．他のスキルは，外へ出す成果物がファイルとして残るなら美の規則を refine の媒体スキルへ委譲し（自分は領域の規則だけを持つ），提案の中にしか存在しない文面（コミット・リリースノート）は自らの媒体へ具体化して自足させ，プロジェクトの内側に留まる成果物（`.claude/context.md`・SKILL.md 等）は後段の /capstone:refine に委ねる——分かれ目は同書が定める．
 - スキル内の相対リンクはプラグイン境界を越えられない——導入時はプラグインごとに `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/` へ個別展開されるため，他プラグインのファイルを指す `../../../` は解決しない（このリポジトリ上では通るので気づきにくい）．他プラグインの正典に従わせるには，パス参照ではなくそのプラグインのスキルへ委譲し，`dependencies` に宣言する．
 - 定義を直す先は常にこのリポジトリ．導入済みの実体（`cache` 配下）を書き換えても，プラグインの更新で上書きされて消える——/heal:skill もこの区別に従う．
 - 開発中のプラグインは `.claude/skills/<plugin>/` へのジャンクションで直接読み込む（skills-dir プラグイン `<plugin>@skills-dir`；導入不要で，SKILL.md の編集は次セッションか /reload-plugins 後に反映される）．検証は CLI ならマーケットプレイス版の導入と同じ `/refine:code` 形式，VS Code 拡張なら素の名前 `/code` で呼び出す．同期は SessionStart フック（[.claude/settings.json](.claude/settings.json)）が [.claude/sync-junctions.ps1](.claude/sync-junctions.ps1) を実行して毎セッション自動で行う；セッション中のプラグイン追加・改名・削除は，同スクリプトを再実行し /reload-plugins で読み直す．
