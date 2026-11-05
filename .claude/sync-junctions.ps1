@@ -1,6 +1,6 @@
 # .claude/skills/ のジャンクションを本リポジトリのプラグイン構成に同期する．
 # 冪等——全リンクを消して張り直すだけで，実フォルダには触れない．
-# プラグインルートごとジャンクションする理由と (suppressed) 時の対処は README の「開発」節を参照．
+# ジャンクションの使い方と，同名のマーケットプレイス版が有効なときの対処は README の「開発」節を参照．
 $ErrorActionPreference = 'Stop'
 $repo   = Split-Path $PSScriptRoot -Parent
 $skills = Join-Path $PSScriptRoot 'skills'
