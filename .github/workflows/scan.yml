@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # scan.py が全コミットメッセージを検査する
+          fetch-depth: 0  # scan.py がマージを除く全コミットメッセージを検査する
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
