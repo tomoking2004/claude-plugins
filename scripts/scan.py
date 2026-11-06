@@ -310,11 +310,7 @@ def check_skills(plugins: set[str]) -> int:
 
 
 def markdown() -> list[Path]:
-    """走査対象の Markdown——リポジトリ直下（README・CLAUDE）と plugins/ 配下の全て．
-
-    .claude/skills/ の中身は plugins/ の各プラグインへのジャンクションなので
-    辿らない（辿れば同じものを二重に見るだけになる）．
-    """
+    """走査対象の Markdown——リポジトリ直下（README・CLAUDE）と plugins/ 配下の全て．"""
     return sorted(REPO.glob("*.md")) + distributed()
 
 
@@ -491,25 +487,6 @@ def check_endings() -> int:
                 if first == second == third:
                     fail(rel(md), f"文末「{first}．」が3回続く")
     return count
-
-
-def check_encoding() -> int:
-    """追跡中の .ps1 が，非 ASCII を含むなら BOM を持つか．
-
-    BOM が無いと Windows PowerShell 5.1 はシステムの符号化で読み，コメント末尾の
-    全角句点が次の行を飲み込む．走査したファイルの数を返す．
-    """
-    tracked = subprocess.run(
-        ["git", "ls-files", "-z", "--", "*.ps1"],
-        cwd=REPO, capture_output=True, text=True, encoding="utf-8",
-    ).stdout.split("\0")
-    paths = (REPO / name for name in tracked if name)
-    scripts = [path for path in paths if path.exists()]
-    for path in scripts:
-        raw = path.read_bytes()
-        if not raw.isascii() and not raw.startswith(b"\xef\xbb\xbf"):
-            fail(rel(path), "非 ASCII を含むのに BOM が無い")
-    return len(scripts)
 
 
 def check_distribution() -> int:
@@ -708,7 +685,6 @@ def main() -> int:
         "写しの断片": check_unlisted_copies(),
         "強調": check_emphasis(),
         "文末": check_endings(),
-        "ps1": check_encoding(),
         "配布文書": check_distribution(),
         "環境語の文書": check_environment(),
         "動的コンテキスト": check_dynamic_context(plugins),

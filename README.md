@@ -83,9 +83,7 @@ capstone と assignment は美の仕上げを refine のスキルへ委譲する
 
 ### 手元での読み込み
 
-開発中のプラグインは，`plugins/<plugin>` を指す `.claude/skills/<plugin>/` のジャンクションで直接読み込む（skills-dir プラグイン `<plugin>@skills-dir`；導入不要で，SKILL.md の編集は遅くとも次セッションか `/reload-plugins` 後に反映される）．同名のマーケットプレイス版が有効だとジャンクションは読まれないので，そのときは `claude --plugin-dir plugins/<plugin>` で作業ツリーの版を読ませる．検証では，マーケットプレイス版を導入したときと同じ `/refine:code` 形式で呼び出す．ジャンクションの同期は SessionStart フック（[.claude/settings.json](.claude/settings.json)）が [.claude/sync-junctions.ps1](.claude/sync-junctions.ps1) を実行して毎セッション自動で行う．セッション中にプラグインを追加・改名・削除したら，同スクリプトを再実行し `/reload-plugins` で定義を読み直す．
-
-プロジェクトの `.claude/skills/` にあるプラグインは，そのフォルダの信頼ダイアログを受け入れるまで読まれない．初回起動や信頼状態のリセット後にスキルが見えなければ，ダイアログを確定して `/reload-plugins` を実行する．
+開発中のプラグインは，`claude --plugin-dir plugins` で作業ツリーの版を読ませる．全プラグインが読まれ，同名の導入済みの版より優先される．SKILL.md の編集は，遅くとも次セッションか `/reload-plugins` 後に反映される．検証では，マーケットプレイス版を導入したときと同じ `/refine:code` 形式で呼び出す．
 
 ### 不変条件の走査
 
@@ -98,7 +96,6 @@ capstone と assignment は美の仕上げを refine のスキルへ委譲する
 | 写し | `COPIES`（定型文の照合元）のキーの語を持つ配布文書（plugins/ 配下の Markdown）が，定型文を一字違わず持つこと．30字以上の同じ断片（句点・セミコロン・コロン・ダッシュで切った単位）が，`COPIES` に載らないまま二つ以上の配布文書に現れないこと |
 | 配布文書 | 所有者の固有名・日付が無いこと．ops の全スキルと /capstone:commit ・ /capstone:release ・ /refine:docs を除く配布文書に，実行環境に固有の語（ツール名等）が無いこと |
 | 書き方 | GitHub の描画で閉じない `**`，同じ文末の3連続，description の体言止めが無いこと |
-| 符号化 | 非 ASCII を含む追跡中の `.ps1` が，Windows PowerShell 5.1 が誤読しないよう BOM を持つこと |
 | コミット | マージを除く全コミットメッセージの機械的な部分——件名の形式と長さ，件名と本文を分ける空行，本文の折り返し，ツールが注入するトレーラの不在（規律そのものは /capstone:commit の「文面の基準」と「固有の走査」が定める） |
 
 声（文の調子）・因果・1コミット1意図は機械に判定できないので scan.py は担わない．

@@ -1,5 +1,3 @@
-.claude/*
-!.claude/settings.json
-!.claude/sync-junctions.ps1
+.claude/
 .local/
 __pycache__/
