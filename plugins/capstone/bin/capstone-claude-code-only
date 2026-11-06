@@ -1,0 +1,3 @@
+#!/bin/sh
+# プラグインの最上位に bin/ があると，Claude はそのプラグインを追加できない．capstone は手元のリポジトリを扱うのが役目なので，このファイルで Claude Code 専用にする．
+echo "capstone は Claude Code 専用である．"

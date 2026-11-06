@@ -2,7 +2,7 @@
 
 [![scan](https://github.com/tomoking2004/claude-plugins/actions/workflows/scan.yml/badge.svg)](.github/workflows/scan.yml)
 
-Claude Code プラグインのマーケットプレイス．構想・仕上げ・記録・公開・運用の作業をスキル（Claude が従う手順の定義）にまとめ，全プラグインを一つの美の基準（美の6条．[plugins/refine/BEAUTY.md](plugins/refine/BEAUTY.md)）で貫く．
+Claude と Claude Code のプラグインのマーケットプレイス．構想・仕上げ・記録・公開・運用の作業をスキル（Claude が従う手順の定義）にまとめ，全プラグインを一つの美の基準（美の6条．[plugins/refine/BEAUTY.md](plugins/refine/BEAUTY.md)）で貫く．
 
 ## なぜ
 
@@ -37,6 +37,8 @@ Claude Code プラグインのマーケットプレイス．構想・仕上げ�
 
 capstone と assignment は美の仕上げを refine のスキルへ委譲する．heal 以外の全プラグインは失敗時に /heal:skill を呼ぶ．依存先（refine・heal）は各 `plugin.json` の `dependencies` に宣言してある．
 
+### Claude Code
+
 次を実行する．`/plugin install` の行は使うプラグインの分だけでよく，依存先は併せて入る．
 
 ```text
@@ -48,6 +50,24 @@ capstone と assignment は美の仕上げを refine のスキルへ委譲する
 /plugin install ops@tomoking2004
 /plugin install heal@tomoking2004
 ```
+
+### Claude
+
+Claude（claude.ai とデスクトップアプリのチャット・Cowork）では，有料プランで次の順に追加する．
+
+1. Customize > Plugins > Add > Add marketplace に `tomoking2004/claude-plugins` を入れる．
+2. 使うプラグインを追加する．capstone と ops は Claude Code 専用で，Claude には追加できない——capstone は手元のリポジトリを，ops は手元のマシンを扱うのが役目である．
+3. 依存先も手で追加する（assignment には refine と heal，他のプラグインには heal）．Claude では `dependencies` が効かない．
+
+追加したプラグインは，同じアカウントでサインインした Claude Code にも同期される．その Claude Code に同名のプラグインを `/plugin install` で導入して有効にしてあれば，導入した版が優先される．
+
+チャットでは，`/` のメニューからスキルを選ぶか，依頼を言葉で書く．チャットからは手元のファイルにも git リポジトリにも触れないので，対象は会話に添えて渡す．使える範囲はプラグインごとに異なる（Cowork での範囲は定めていない）．
+
+| プラグイン | チャットで使える範囲 |
+| --- | --- |
+| refine・assignment | 全スキル |
+| groundwork | 全スキル——文脈のファイル（`.claude/context.md`）を残せないので，全文を会話に添えて受け渡す |
+| heal | /heal:skill の診断と修正案まで——定義の書き換えと /heal:canon は，リポジトリのある環境で行う |
 
 ## 使い方
 
@@ -62,6 +82,8 @@ capstone と assignment は美の仕上げを refine のスキルへ委譲する
 | Claude Code の履歴を消す | このマシンに溜まった履歴・痕跡を，/ops:clean が何を消すか列挙して承認を得たうえで掃除する——ログイン・設定・導入済みプラグイン・自動メモリは残す |
 | 失敗したスキルを直す | /heal:skill が定義を更新し再発を防ぐ |
 | 定義全体を手入れする | 溜まった重複と食い違いを，/heal:canon が定義全体を見直して解消する |
+
+チャットで使える範囲は，「導入」の表が定める．
 
 ## 開発
 
@@ -81,6 +103,13 @@ capstone と assignment は美の仕上げを refine のスキルへ委譲する
 - 提案の中にしか存在しない文面（コミット・リリースノート）を書くスキルは，美の基準を自らの媒体へ具体化して自足する．
 - プロジェクトの内側に留まる成果物（`.claude/context.md`・SKILL.md 等）は，後段の /capstone:refine に委ねる．
 
+### Claude への対応
+
+- Claude でも使うプラグインは，チャットでも読み込まれる部品（スキル）で組む——hooks と agents はチャットでは無視される．
+- プラグインの最上位に `bin/` があると，Claude はそのプラグインを追加できない．Claude Code 専用のプラグイン（capstone・ops）にだけ `bin/` を置く．`plugin.json` には対応先（Claude か Claude Code か）を宣言する項目が無いので，`bin/` で追加を止める．
+- `dependencies` は `<plugin>@<marketplace>` の形で書く．Claude から同期された版はマーケットプレイスに属さない．Claude Code の公式文書は，その版の依存が満たされる条件を，マーケットプレイス名付きの指定についてしか定めていない．
+- スキルの外にあるプラグイン内の文書（BEAUTY.md 等）も，チャットで読める——実機で確かめた挙動である．
+
 ### 手元での読み込み
 
 開発中のプラグインは，`claude --plugin-dir plugins` で作業ツリーの版を読ませる．全プラグインが読まれ，同名の導入済みの版より優先される．SKILL.md の編集は，遅くとも次セッションか `/reload-plugins` 後に反映される．検証では，マーケットプレイス版を導入したときと同じ `/refine:code` 形式で呼び出す．
@@ -91,7 +120,7 @@ capstone と assignment は美の仕上げを refine のスキルへ委譲する
 
 | 検査 | 確かめること |
 | --- | --- |
-| 構成 | マニフェストとディレクトリ構成の一致，SemVer，`dependencies` の実在，SKILL.md の frontmatter，素の名前が組み込みコマンドと衝突せず一意であること |
+| 構成 | マニフェストとディレクトリ構成の一致，SemVer，`dependencies` の形式と実在，SKILL.md の frontmatter，素の名前が組み込みコマンドと衝突せず一意であること．`bin/` を持つプラグインが，Claude Code 専用のものと一致すること |
 | 文書 | 相対リンクが実在してプラグイン境界を越えないこと．動的コンテキスト（読み込み時に走るコマンド）が代表的な git 状態で exit 0 かつ非空の出力を返すこと（規律そのものは /refine:docs の「媒体の正典」が定める）．「美の6条」の件数と全参照の一致 |
 | 写し | `COPIES`（定型文の照合元）のキーの語を持つ配布文書（plugins/ 配下の Markdown）が，定型文を一字違わず持つこと．30字以上の同じ断片（句点・セミコロン・コロン・ダッシュで切った単位）が，`COPIES` に載らないまま二つ以上の配布文書に現れないこと |
 | 配布文書 | 所有者の固有名・日付が無いこと．ops の全スキルと /capstone:commit ・ /capstone:release ・ /refine:docs を除く配布文書に，実行環境に固有の語（ツール名等）が無いこと |

@@ -9,5 +9,5 @@
   "repository": "https://github.com/tomoking2004/claude-plugins",
   "license": "MIT",
   "keywords": ["claude-code", "skills", "assignment", "coursework"],
-  "dependencies": ["refine", "heal"]
+  "dependencies": ["refine@tomoking2004", "heal@tomoking2004"]
 }

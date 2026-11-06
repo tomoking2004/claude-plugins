@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
   "name": "tomoking2004",
-  "description": "全てを一つの美の基準で貫く Claude Code プラグイン群．",
+  "description": "全てを一つの美の基準で貫く，Claude と Claude Code のプラグイン群．",
   "owner": {
     "name": "tomoking2004"
   },

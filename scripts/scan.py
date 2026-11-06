@@ -122,7 +122,7 @@ COPIES = {
         "長い作業の途中で，会話が要約された・同じ欠陥を二度直した・読み直すと"
         "直しが消えていた・スキルの定義を読み直さずに書いた，のどれかが起きたら，"
         "区切りのよい箇所で止める．"
-        "続きの状態をファイルに残し，別セッションに貼ればそのまま動く依頼の全文"
+        "続きの状態はファイルに残せるなら残し，別セッションに貼ればそのまま動く依頼の全文"
         "（目的・読むもの・済んだこと・残り・守る決定）を示して，移るよう促す．"
     ),
     "差し止める指摘": (
@@ -174,14 +174,23 @@ COPIES = {
         "見える．通さなかった走査があれば，その旨と理由も書く．"
     ),
     "両者を満たせば足り": "**両者を満たせば足り，実行時に他所を参照しない**．",
+    "会話に添えられた全文": (
+        "`.claude/context.md` を読む（ファイルを残せない環境では，"
+        "会話に添えられた全文を読む）．"
+    ),
     "/groundwork:survey を先に": (
-        "存在しなければ「/groundwork:survey を先に実行してください」と伝え，中断する．"
+        "読むものが無ければ「/groundwork:survey を先に実行するか，"
+        "文脈の全文を添えてください」と伝え，中断する．"
     ),
     "機械の走査がゼロ": (
         "目的を定める文書は意図に数えず渡す．"
         "検査役の担当から，機械の走査がゼロを返した項目を除く．"
         "検査役が製品・ツールの公式文書と照合するのは，"
         "それを語る文が変わったときと全文の読みだけとする．"
+    ),
+    "確定した全文を渡し": (
+        "ファイルを残せない環境では，確定した全文を渡し，"
+        "次の会話に添えるよう伝える．"
     ),
     "未確定は未確定": "未確定は未確定と書き，手順2に戻って問う．",
     "前提の位置": "未確定の事実を前提の位置（設計・整合条件）に置いていないか",
@@ -190,7 +199,7 @@ COPIES = {
 # これより短い一致は，語句の偶然の一致と見分けがつかない．
 COPY_MIN = 30
 # 写しの件数の控え．キーの語ごと書き換えた写しは照合を逃れ，件数の減りにだけ現れる．
-COPY_TOTAL = 127
+COPY_TOTAL = 131
 
 DATE = re.compile(r"(?<!\d)20\d{2}[-/年]\d{1,2}")
 # 環境語を許す配布文書．ops は環境の操作そのものを担い，commit・release・docs は
@@ -205,6 +214,8 @@ ENV_WORDS = re.compile(
     r"Bash|PowerShell|Monitor|PushNotification|Remote Control|VS Code"
     r"|サブエージェント|ハーネス"
 )
+# Claude Code 専用のプラグイン．プラグインの最上位の bin/ が Claude への追加を止める．
+CLAUDE_CODE_ONLY = {"capstone", "ops"}
 
 violations: list[str] = []
 
@@ -266,7 +277,8 @@ def check_manifests() -> set[str]:
             fail(rel(marketplace), f"{name} の source が違う（{source}）")
 
     for name in sorted(present):
-        path = REPO / "plugins" / name / ".claude-plugin" / "plugin.json"
+        root = REPO / "plugins" / name
+        path = root / ".claude-plugin" / "plugin.json"
         m = json.loads(path.read_text(encoding="utf-8"))
         if m.get("name") != name:
             fail(rel(path), f"name がディレクトリと食い違う（{m.get('name')!r}）")
@@ -274,8 +286,13 @@ def check_manifests() -> set[str]:
             fail(rel(path), f"version が SemVer でない（{m.get('version')!r}）")
         if not m.get("description"):
             fail(rel(path), "description が無い")
+        if any((root / "bin").glob("*")) != (name in CLAUDE_CODE_ONLY):
+            fail(rel(root), "bin/ の有無が CLAUDE_CODE_ONLY と食い違う")
         for dep in m.get("dependencies", []):
-            if dep not in listed:
+            target, _, origin = str(dep).partition("@")
+            if origin != market["name"]:
+                fail(rel(path), f"dependency {dep} が @{market['name']} を持たない")
+            if target not in listed:
                 fail(rel(path), f"dependency {dep} がマーケットプレイスに無い")
 
     return present
