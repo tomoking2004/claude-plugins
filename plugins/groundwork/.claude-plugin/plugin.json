@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "groundwork",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "文脈（.claude/context.md）を単一の真実として，プロジェクトの構想を進める工程スキル群．",
   "author": {
     "name": "tomoking2004"
