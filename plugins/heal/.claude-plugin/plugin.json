@@ -1,5 +1,4 @@
 {
-  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "heal",
   "version": "0.3.0",
   "description": "スキルの失敗・批判の根本原因を診断して直し，定義全体の重複と食い違いも解消して再発を防ぐ保守スキル群．",
