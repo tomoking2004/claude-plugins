@@ -16,18 +16,18 @@ Claude と Claude Code のプラグインのマーケットプレイス．構想
 「完璧」は二層で保たれる．
 
 - **実行**：スキルは判断を走査の規律に還元する．だから一定の能力があればどのモデルでも，同じ走査で同じ確定版を目指せる．
-- **進化**：その規律で捉えきれない観点が現れたら，/heal:skill が規律そのものを直し，以後は全モデルがそれを継承する．
+- **進化**：その規律で捉えきれない観点が現れたら，/heal:heal-skill が規律そのものを直し，以後は全モデルがそれを継承する．
 
 ## プラグイン
 
 | プラグイン | 役目 | 軸 | スキル |
 | --- | --- | --- | --- |
-| groundwork | 文脈を単一の真実として構想を進める | 構想の工程 | /groundwork:survey → /groundwork:theory → /groundwork:impl |
-| refine | 成果物を媒体ごとに確定版へ仕上げる | 媒体 | /refine:code ・ /refine:docs |
-| capstone | 全体を仕上げ，記録し，公開する | 完成の工程 | /capstone:refine → /capstone:commit → /capstone:release |
-| assignment | 大学の課題を出題文に照らして仕上げる | 課題の媒体 | /assignment:complete → /assignment:report ・ /assignment:program |
-| ops | 長い実行の起動・監視と痕跡の掃除を担う | 運用の局面 | /ops:exec ・ /ops:progress ・ /ops:clean |
-| heal | 失敗の原因を診断して定義を直す | 治療の対象 | /heal:skill ・ /heal:canon |
+| groundwork | 文脈を単一の真実として構想を進める | 構想の工程 | /groundwork:survey-context → /groundwork:discuss-theory → /groundwork:verify-impl |
+| refine | 成果物を媒体ごとに確定版へ仕上げる | 媒体 | /refine:refine-code ・ /refine:refine-docs |
+| capstone | 全体を仕上げ，記録し，公開する | 完成の工程 | /capstone:refine-project → /capstone:commit-changes → /capstone:release-version |
+| assignment | 大学の課題を出題文に照らして仕上げる | 課題の媒体 | /assignment:complete-assignment → /assignment:write-report ・ /assignment:write-code |
+| ops | 長い実行の起動・監視と痕跡の掃除を担う | 運用の局面 | /ops:run-job ・ /ops:check-job ・ /ops:clean-traces |
+| heal | 失敗の原因を診断して定義を直す | 治療の対象 | /heal:heal-skill ・ /heal:heal-canon |
 
 `→` は工程の順（assignment では委譲の向き），`・` は同列を表す．
 
@@ -35,7 +35,7 @@ Claude と Claude Code のプラグインのマーケットプレイス．構想
 
 ## 導入
 
-capstone と assignment は美の仕上げを refine のスキルへ委譲する．heal 以外の全プラグインは失敗時に /heal:skill を呼ぶ．依存先（refine・heal）は各 `plugin.json` の `dependencies` に宣言してある．
+capstone と assignment は美の仕上げを refine のスキルへ委譲する．heal 以外の全プラグインは失敗時に /heal:heal-skill を呼ぶ．依存先（refine・heal）は各 `plugin.json` の `dependencies` に宣言してある．
 
 ### Claude Code
 
@@ -67,21 +67,21 @@ Claude（claude.ai とデスクトップアプリのチャット・Cowork）で�
 | --- | --- |
 | refine・assignment | 全スキル |
 | groundwork | 全スキル——文脈のファイル（`.claude/context.md`）を残せないので，全文を会話に添えて受け渡す |
-| heal | /heal:skill の診断と修正案まで——定義の書き換えと /heal:canon は，リポジトリのある環境で行う |
+| heal | /heal:heal-skill の診断と修正案まで——定義の書き換えと /heal:heal-canon は，リポジトリのある環境で行う |
 
 ## 使い方
 
 | やりたいこと | スキル |
 | --- | --- |
-| 構想を固める | /groundwork:survey で文脈を確立し，/groundwork:theory で方針を固め，/groundwork:impl で実装との整合を走査する |
-| 大学の課題を仕上げる | /assignment:complete が出題文から仕上げまで運ぶ——単一媒体なら report・program のスキルを直接使う |
-| 成果物を仕上げる | /capstone:refine が範囲を媒体に分解し，/refine:code ・ /refine:docs へ委譲する——単一媒体なら refine のスキルを直接使う |
-| 記録・公開する | /capstone:commit で記録し，/capstone:release で公開する |
-| 長いプログラムを走らせる | 数十秒を超えて走るもの（学習・評価・サーバ等）は，スキル名の指定が無くても /ops:exec が起動から完了報告までを担う．数十秒で終わる実行（テスト・ビルド等）は素のまま走らせる |
-| 走っているものの様子を見る | /ops:progress が答える |
-| Claude Code の履歴を消す | このマシンに溜まった履歴・痕跡を，/ops:clean が何を消すか列挙して承認を得たうえで掃除する——ログイン・設定・導入済みプラグイン・自動メモリは残す |
-| 失敗したスキルを直す | /heal:skill が定義を更新し再発を防ぐ |
-| 定義全体を手入れする | 溜まった重複と食い違いを，/heal:canon が定義全体を見直して解消する |
+| 構想を固める | /groundwork:survey-context で文脈を確立し，/groundwork:discuss-theory で方針を固め，/groundwork:verify-impl で実装との整合を走査する |
+| 大学の課題を仕上げる | /assignment:complete-assignment が出題文から仕上げまで運ぶ——単一媒体なら /assignment:write-report ・ /assignment:write-code を直接使う |
+| 成果物を仕上げる | /capstone:refine-project が範囲を媒体に分解し，/refine:refine-code ・ /refine:refine-docs へ委譲する——単一媒体なら refine のスキルを直接使う |
+| 記録・公開する | /capstone:commit-changes で記録し，/capstone:release-version で公開する |
+| 長いプログラムを走らせる | 数十秒を超えて走るもの（学習・評価・サーバ等）は，スキル名の指定が無くても /ops:run-job が起動から完了報告までを担う．数十秒で終わる実行（テスト・ビルド等）は素のまま走らせる |
+| 走っているものの様子を見る | /ops:check-job が答える |
+| Claude Code の履歴を消す | このマシンに溜まった履歴・痕跡を，/ops:clean-traces が何を消すか列挙して承認を得たうえで掃除する——ログイン・設定・導入済みプラグイン・自動メモリは残す |
+| 失敗したスキルを直す | /heal:heal-skill が定義を更新し再発を防ぐ |
+| 定義全体を手入れする | 溜まった重複と食い違いを，/heal:heal-canon が定義全体を見直して解消する |
 
 チャットで使える範囲は，「導入」の表が定める．
 
@@ -90,10 +90,11 @@ Claude（claude.ai とデスクトップアプリのチャット・Cowork）で�
 ### 構成
 
 - プラグイン＝`.claude-plugin/plugin.json` を持つ，`plugins/` 直下のディレクトリ．スキルは `plugins/<plugin>/skills/<name>/SKILL.md` に置く．
-- 媒体をまたぐ委譲元スキル（範囲を媒体へ分解し各媒体スキルへ委譲するもの）の置き場は，領域固有性で決める．/assignment:complete は「課題の媒体」軸には乗らないが，課題全体を束ねる役は課題領域に固有で他に置き場が無いため assignment に内包する．一方で媒体をまたぐ仕上げ（/capstone:refine）はどの領域にも属さず完成の工程の関心なので，refine は純粋な媒体軸に保ち，委譲元は capstone へ外出しする．
+- 媒体をまたぐ委譲元スキル（範囲を媒体へ分解し各媒体スキルへ委譲するもの）の置き場は，領域固有性で決める．/assignment:complete-assignment は「課題の媒体」軸には乗らないが，課題全体を束ねる役は課題領域に固有で他に置き場が無いため assignment に内包する．一方で媒体をまたぐ仕上げ（/capstone:refine-project）はどの領域にも属さず完成の工程の関心なので，refine は純粋な媒体軸に保ち，委譲元は capstone へ外出しする．
 - スキル名は組み込みコマンド名（/context ・ /review ・ /init ・ /status 等）と一致させず，プラグインをまたいでも重複させない——素の名前（名前空間を除いた名前）はマーケットプレイス全体で一意に保つ．プラグインのスキルは `/<plugin>:<skill>` のほか素の名前でも呼べるが，素の名前が効くのは他のコマンドがその名を使っていないときだけである．
+- スキル名は「動詞-目的語」の形（refine-code・heal-skill）にそろえ，素の名前だけで役目が分かるようにする．先頭に置ける動詞は scan.py の `SKILL_VERBS` が持つ．
 - スキル内の相対リンクはプラグイン境界を越えられない——導入時はプラグインごとに `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/` へ個別展開されるため，他プラグインのファイルを指す `../../../` は解決しない（このリポジトリ上では通るので気づきにくい）．他プラグインの規則に従わせるには，パス参照ではなくそのプラグインのスキルへ委譲し，`dependencies` に宣言する．
-- 配布する定義を直す先は常にこのリポジトリ．導入済みの実体（`cache` 配下）を書き換えても，プラグインの更新で上書きされて消える——/heal:skill もこの区別に従う．利用者固有の好み・事実は配布する定義でなく，利用者のプロジェクト側に置く．
+- 配布する定義を直す先は常にこのリポジトリ．導入済みの実体（`cache` 配下）を書き換えても，プラグインの更新で上書きされて消える——/heal:heal-skill もこの区別に従う．利用者固有の好み・事実は配布する定義でなく，利用者のプロジェクト側に置く．
 
 ### 美の基準
 
@@ -101,7 +102,7 @@ Claude（claude.ai とデスクトップアプリのチャット・Cowork）で�
 
 - 外へ出す成果物がファイルとして残るなら，美の規則（その媒体でどう書けば美しいか）を refine の媒体スキルへ委譲し，委譲元は領域の規則（何を満たせば目的に適うか）だけを持つ．
 - 提案の中にしか存在しない文面（コミット・リリースノート）を書くスキルは，美の基準を自らの媒体へ具体化して自足する．
-- プロジェクトの内側に留まる成果物（`.claude/context.md`・SKILL.md 等）は，後段の /capstone:refine に委ねる．
+- プロジェクトの内側に留まる成果物（`.claude/context.md`・SKILL.md 等）は，後段の /capstone:refine-project に委ねる．
 
 ### Claude への対応
 
@@ -112,7 +113,7 @@ Claude（claude.ai とデスクトップアプリのチャット・Cowork）で�
 
 ### 手元での読み込み
 
-開発中のプラグインは，`claude --plugin-dir plugins` で作業ツリーの版を読ませる．全プラグインが読まれ，同名の導入済みの版より優先される．SKILL.md の編集は，遅くとも次セッションか `/reload-plugins` 後に反映される．検証では，マーケットプレイス版を導入したときと同じ `/refine:code` 形式で呼び出す．
+開発中のプラグインは，`claude --plugin-dir plugins` で作業ツリーの版を読ませる．全プラグインが読まれ，同名の導入済みの版より優先される．SKILL.md の編集は，遅くとも次セッションか `/reload-plugins` 後に反映される．検証では，マーケットプレイス版を導入したときと同じ `/refine:refine-code` 形式で呼び出す．
 
 ### 不変条件の走査
 
@@ -120,12 +121,12 @@ Claude（claude.ai とデスクトップアプリのチャット・Cowork）で�
 
 | 検査 | 確かめること |
 | --- | --- |
-| 構成 | マニフェストとディレクトリ構成の一致，SemVer，`dependencies` の形式と実在，SKILL.md の frontmatter，素の名前が組み込みコマンドと衝突せず一意であること．`bin/` を持つプラグインが，Claude Code 専用のものと一致すること |
-| 文書 | 相対リンクが実在してプラグイン境界を越えないこと．動的コンテキスト（読み込み時に走るコマンド）が代表的な git 状態で exit 0 かつ非空の出力を返すこと（規律そのものは /refine:docs の「媒体の正典」が定める）．「美の6条」の件数と全参照の一致 |
+| 構成 | マニフェストとディレクトリ構成の一致，SemVer，`dependencies` の形式と実在，SKILL.md の frontmatter，素の名前が「動詞-目的語」の形で，組み込みコマンドと衝突せず一意であること．`bin/` を持つプラグインが，Claude Code 専用のものと一致すること |
+| 文書 | 相対リンクが実在してプラグイン境界を越えないこと．動的コンテキスト（読み込み時に走るコマンド）が代表的な git 状態で exit 0 かつ非空の出力を返すこと（規律そのものは /refine:refine-docs の「媒体の正典」が定める）．「美の6条」の件数と全参照の一致 |
 | 写し | `COPIES`（定型文の照合元）のキーの語を持つ配布文書（plugins/ 配下の Markdown）が，定型文を一字違わず持つこと．30字以上の同じ断片（句点・セミコロン・コロン・ダッシュで切った単位）が，`COPIES` に載らないまま二つ以上の配布文書に現れないこと |
-| 配布文書 | 所有者の固有名・日付が無いこと．ops の全スキルと /capstone:commit ・ /capstone:release ・ /refine:docs を除く配布文書に，実行環境に固有の語（ツール名等）が無いこと |
+| 配布文書 | 所有者の固有名・日付が無いこと．ops の全スキルと /capstone:commit-changes ・ /capstone:release-version ・ /refine:refine-docs を除く配布文書に，実行環境に固有の語（ツール名等）が無いこと |
 | 書き方 | GitHub の描画で閉じない `**`，同じ文末の3連続，description の体言止めが無いこと |
-| コミット | マージを除く全コミットメッセージの機械的な部分——件名の形式と長さ，件名と本文を分ける空行，本文の折り返し，ツールが注入するトレーラの不在（規律そのものは /capstone:commit の「文面の基準」と「固有の走査」が定める） |
+| コミット | マージを除く全コミットメッセージの機械的な部分——件名の形式と長さ，件名と本文を分ける空行，本文の折り返し，ツールが注入するトレーラの不在（規律そのものは /capstone:commit-changes の「文面の基準」と「固有の走査」が定める） |
 
 声（文の調子）・因果・1コミット1意図は機械に判定できないので scan.py は担わない．
 
@@ -135,7 +136,7 @@ Claude（claude.ai とデスクトップアプリのチャット・Cowork）で�
 
 ### リリース
 
-各プラグインは独立した SemVer 単位——利用者はプラグインを個別に導入するため，バージョンは変更のあったプラグインだけが上がる（lockstep にしない）．リリースは /capstone:release がプラグインごとに上げ幅を判定し，`<plugin>-vX.Y.Z` 形式のタグと GitHub Release を個別に発行する．
+各プラグインは独立した SemVer 単位——利用者はプラグインを個別に導入するため，バージョンは変更のあったプラグインだけが上がる（lockstep にしない）．リリースは /capstone:release-version がプラグインごとに上げ幅を判定し，`<plugin>-vX.Y.Z` 形式のタグと GitHub Release を個別に発行する．
 
 ## ライセンス
 

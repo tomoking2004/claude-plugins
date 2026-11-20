@@ -27,7 +27,7 @@ SEMVER = re.compile(
     re.ASCII,
 )
 
-# capstone:commit の「文面の基準」「固有の走査」のうち機械に判定できる部分
+# capstone:commit-changes の「文面の基準」「固有の走査」のうち機械に判定できる部分
 # （声・因果・1コミット1意図は，ここからは判定できない）．
 SUBJECT = re.compile(
     r"^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)"
@@ -75,6 +75,14 @@ BUILTIN_COMMANDS = {
     "usage", "usage-credits", "verify", "vim", "voice", "web-setup",
     "workflow-authoring", "workflows",
 }
+
+# 素の名前の先頭に置ける動詞．素の名前は「動詞-目的語」の形にそろえる
+# （README の「構成」）——名詞だけの名前は，素の名前では役目が分からない．
+SKILL_VERBS = {
+    "check", "clean", "commit", "complete", "discuss", "heal", "refine",
+    "release", "run", "survey", "verify", "write",
+}
+SKILL_OBJECT = re.compile(r"[a-z]+(-[a-z]+)*", re.ASCII)
 
 # 各スキルへ写した定型文の照合元．キーの語を持つ配布文書は，値を一字違わず持つ
 # （BEAUTY.md に句のある項は同書が正で，ここはその控え）．
@@ -178,8 +186,8 @@ COPIES = {
         "`.claude/context.md` を読む（ファイルを残せない環境では，"
         "会話に添えられた全文を読む）．"
     ),
-    "/groundwork:survey を先に": (
-        "読むものが無ければ「/groundwork:survey を先に実行するか，"
+    "/groundwork:survey-context を先に": (
+        "読むものが無ければ「/groundwork:survey-context を先に実行するか，"
         "文脈の全文を添えてください」と伝え，中断する．"
     ),
     "機械の走査がゼロ": (
@@ -202,13 +210,14 @@ COPY_MIN = 30
 COPY_TOTAL = 131
 
 DATE = re.compile(r"(?<!\d)20\d{2}[-/年]\d{1,2}")
-# 環境語を許す配布文書．ops は環境の操作そのものを担い，commit・release・docs は
-# ツールの注入やハーネスの値を規則の対象として語る．他は環境に依存させない．
+# 環境語を許す配布文書．ops は環境の操作そのものを担い，commit-changes・
+# release-version・refine-docs はツールの注入やハーネスの値を規則の対象として語る．
+# 他は環境に依存させない．
 ENV_EXEMPT = (
     "plugins/ops/skills/*/SKILL.md",
-    "plugins/capstone/skills/commit/SKILL.md",
-    "plugins/capstone/skills/release/SKILL.md",
-    "plugins/refine/skills/docs/SKILL.md",
+    "plugins/capstone/skills/commit-changes/SKILL.md",
+    "plugins/capstone/skills/release-version/SKILL.md",
+    "plugins/refine/skills/refine-docs/SKILL.md",
 )
 ENV_WORDS = re.compile(
     r"Bash|PowerShell|Monitor|PushNotification|Remote Control|VS Code"
@@ -299,7 +308,10 @@ def check_manifests() -> set[str]:
 
 
 def check_skills(plugins: set[str]) -> int:
-    """各 SKILL.md の frontmatter がディレクトリと一致し，description が文で終わり，素の名前が一意か．
+    """各 SKILL.md の frontmatter と素の名前が規約に従うか．
+
+    frontmatter はディレクトリと一致し，description は文で終わり，素の名前は
+    「動詞-目的語」の形で，組み込みコマンドと衝突せず一意である．
 
     走査したスキルの数を返す．
     """
@@ -315,8 +327,11 @@ def check_skills(plugins: set[str]) -> int:
             fail(rel(path), f"name がディレクトリと食い違う（{fm.get('name')!r}）")
         if not fm.get("description"):
             fail(rel(path), "description が無い")
+        verb, _, obj = d.name.partition("-")
+        if verb not in SKILL_VERBS or not SKILL_OBJECT.fullmatch(obj):
+            fail(rel(path), f"素の名前 /{d.name} が「動詞-目的語」の形でない")
         # 平仮名で終わらない文は体言止め——短くしても文として成立させる
-        # （refine:docs の「description」）．
+        # （refine:refine-docs の「description」）．
         plain = re.sub(r"（[^（）]*）", "", fm.get("description", ""))
         for sentence in re.findall(r"[^．]+．", plain):
             if not re.match(r"[ぁ-ん]", sentence[-2]):
@@ -496,7 +511,7 @@ def check_emphasis() -> int:
 
 
 def check_endings() -> int:
-    """一つの段落・項の中で，同じ文末が3回続かないか（refine:docs の「近接の反復」）．
+    """一つの段落・項の中で，同じ文末が3回続かないか（refine:refine-docs の「近接の反復」）．
 
     文末は句点の前の2字で見る．走査した文の数を返す．
     """
@@ -580,7 +595,7 @@ def fixtures() -> dict[str, str]:
             f"{first} && git tag v0.1.0"
             f" && touch b && git add . && {commit} 'fix: b'"
         ),
-        # 見直しの記録がある状態．heal:canon の動的コンテキストの本筋が通る．
+        # 見直しの記録がある状態．heal:heal-canon の動的コンテキストの本筋が通る．
         "after-review": (
             "git init -q . && touch a && git add ."
             f" && {commit} 'chore: review the canon'"
@@ -594,7 +609,7 @@ def fixtures() -> dict[str, str]:
 def check_dynamic_context(plugins: set[str]) -> int:
     """SKILL.md の各 !`...` が exit 0 かつ非空の出力を返すか．
 
-    非ゼロ終了はスキルの呼び出しごと止める（refine:docs の
+    非ゼロ終了はスキルの呼び出しごと止める（refine:refine-docs の
     「媒体の正典」）．exit 0 でも出力が空になることはある——タグが HEAD に
     あるとき `git log "$tag..HEAD"` は成功しつつ何も返さず，`|| echo "（なし）"`
     の代替文は発火しない．空の節は何を示すのか読み手に分からないので，
@@ -640,7 +655,7 @@ def check_dynamic_context(plugins: set[str]) -> int:
 
 
 def check_commits() -> int:
-    """マージを除く全コミットメッセージが capstone:commit の機械的な部分を満たすか．
+    """マージを除く全コミットメッセージが capstone:commit-changes の機械的な部分を満たすか．
 
     マージの件名はホスティングが機械的に作るので，形式を負わせない．
 
