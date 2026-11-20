@@ -27,6 +27,7 @@ Claude と Claude Code のプラグインのマーケットプレイス．構想
 | capstone | 全体を仕上げ，記録し，公開する | 完成の工程 | /capstone:refine-project → /capstone:commit-changes → /capstone:release-version |
 | assignment | 大学の課題を出題文に照らして仕上げる | 課題の媒体 | /assignment:complete-assignment → /assignment:write-report ・ /assignment:write-code |
 | ops | 長い実行の起動・監視と痕跡の掃除を担う | 運用の局面 | /ops:run-job ・ /ops:check-job ・ /ops:clean-traces |
+| forge | 既存のスキルを調べて比べ，新しいスキルを作る | 作る定義 | /forge:distill-skill |
 | fox | Claude とその分身（サブエージェント）が働く様子を，ドット絵のキツネでパネルに映す | — | —（`/fox` でパネルを開く） |
 | heal | 失敗の原因を診断して定義を直す | 治療の対象 | /heal:heal-skill ・ /heal:heal-canon |
 
@@ -49,8 +50,15 @@ capstone と assignment は美の仕上げを refine のスキルへ委譲する
 /plugin install capstone@tomoking2004
 /plugin install assignment@tomoking2004
 /plugin install ops@tomoking2004
+/plugin install forge@tomoking2004
 /plugin install fox@tomoking2004
 /plugin install heal@tomoking2004
+```
+
+forge は実行評価を Anthropic 公式の skill-creator へ委譲する．skill-creator は依存に宣言していないので，無ければ次で導入する．
+
+```text
+/plugin install skill-creator@claude-plugins-official
 ```
 
 ### Claude
@@ -69,6 +77,7 @@ Claude（claude.ai とデスクトップアプリのチャット・Cowork）で�
 | --- | --- |
 | refine・assignment | 全スキル |
 | groundwork | 全スキル——文脈のファイル（`.claude/context.md`）を残せないので，全文を会話に添えて受け渡す |
+| forge | /forge:distill-skill の調査から内容の判定まで——実行の比較は Claude Code で行う |
 | heal | /heal:heal-skill の診断と修正案まで——定義の書き換えと /heal:heal-canon は，リポジトリのある環境で行う |
 
 ## 使い方
@@ -82,6 +91,7 @@ Claude（claude.ai とデスクトップアプリのチャット・Cowork）で�
 | 長いプログラムを走らせる | 数十秒を超えて走るもの（学習・評価・サーバ等）は，スキル名の指定が無くても /ops:run-job が起動から完了報告までを担う．数十秒で終わる実行（テスト・ビルド等）は素のまま走らせる |
 | 走っているものの様子を見る | /ops:check-job が答える |
 | Claude Code の履歴を消す | このマシンに溜まった履歴・痕跡を，/ops:clean-traces が何を消すか列挙して承認を得たうえで掃除する——ログイン・設定・導入済みプラグイン・自動メモリは残す |
+| 新しいスキルを作る | /forge:distill-skill が類似の既存スキルを調べて比べ，取捨を決めてから，実行評価を skill-creator へ委譲する |
 | 待ち時間を楽しく過ごす | fox を導入すると，Claude とその分身（サブエージェント）が働く様子を，キツネのアニメーションがパネルに映す．VS Code・デスクトップアプリ・モバイルではパネルが自動で開く．端末では自動で開かず，`/fox` で開くと，絵の代わりに役割が文字で並ぶ．閉じたパネルも `/fox` で開き直す．キツネの絵の下には，受けている指示を表す一言が出る．Claude 自身の一言は，依頼（スラッシュコマンドを除く）を送るたびに，小さなモデルを1回呼び出して付ける．パネルを開いていなくても呼び出しは走り，その費用はセッションに計上される．絵と仕組みは [plugins/fox/DESIGN.md](plugins/fox/DESIGN.md) が定める |
 | 失敗したスキルを直す | /heal:heal-skill が定義を更新し再発を防ぐ |
 | 定義全体を手入れする | 溜まった重複と食い違いを，/heal:heal-canon が定義全体を見直して解消する |

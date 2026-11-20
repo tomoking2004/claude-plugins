@@ -1,0 +1,12 @@
+{
+  "name": "forge",
+  "version": "0.1.0",
+  "description": "既存のスキルを調べて比べ，取捨を決めてから新しいスキルを作る，定義づくりのスキル群．",
+  "author": {
+    "name": "tomoking2004"
+  },
+  "repository": "https://github.com/tomoking2004/claude-plugins",
+  "license": "MIT",
+  "keywords": ["claude-code", "skills", "meta", "skill-authoring"],
+  "dependencies": ["heal@tomoking2004"]
+}
