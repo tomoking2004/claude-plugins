@@ -11,6 +11,7 @@
     { "name": "capstone", "source": "./plugins/capstone" },
     { "name": "assignment", "source": "./plugins/assignment" },
     { "name": "ops", "source": "./plugins/ops" },
+    { "name": "fox", "source": "./plugins/fox" },
     { "name": "heal", "source": "./plugins/heal" }
   ]
 }

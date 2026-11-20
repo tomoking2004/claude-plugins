@@ -1,0 +1,3 @@
+#!/bin/sh
+# プラグインの最上位に bin/ があると，Claude はそのプラグインを追加できない．fox は Claude Code の画面にパネルを足すのが役目なので，このファイルで Claude Code 専用にする．
+echo "fox は Claude Code 専用である．"

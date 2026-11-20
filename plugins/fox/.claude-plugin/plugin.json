@@ -1,0 +1,12 @@
+{
+  "name": "fox",
+  "version": "0.1.0",
+  "description": "Claude とその分身（サブエージェント）が働く様子を，ドット絵のキツネでパネルに映す．待ち時間を楽しく過ごすためのもの．",
+  "author": {
+    "name": "tomoking2004"
+  },
+  "repository": "https://github.com/tomoking2004/claude-plugins",
+  "license": "MIT",
+  "keywords": ["claude-code", "mod", "pane", "pixel-art", "companion"],
+  "types": "./types/index.d.ts"
+}
