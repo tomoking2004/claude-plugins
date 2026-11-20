@@ -1,51 +1,56 @@
 ---
 name: release-version
 description: リリース単位（単一パッケージか monorepo か）を判定し，SemVer で新バージョンを定め（マニフェストと全参照箇所を整合），bump コミット・タグ・About 欄・GitHub Release の文面を提案し，承認後に push まで一気に実行する．「リリースして」「公開して」「バージョンを上げて」など版を公にすることを求められたときに使う．記録するだけなら /capstone:commit-changes を使う．
+allowed-tools: Bash(git log *) Bash(gh repo view *) Bash(gh release view *)
 ---
 
 対象：リリース単位（単一パッケージ，または独立にバージョン管理される monorepo の各パッケージ）と，その版を公にする一式——マニフェストのバージョン・bump コミット・タグ・GitHub Release・About 欄．
 
+## リポジトリ
+
+!`git rev-parse --show-toplevel 2>/dev/null | grep '' || echo "（git リポジトリではない）"`
+
 ## 現在の状態
 
-!`git rev-parse --git-dir >/dev/null 2>&1 || { echo "（git リポジトリではない）"; exit 0; }; s=$(git status --short); [ -n "$s" ] && echo "$s" || echo "（作業ツリーは清潔）"`
+!`git status --short 2>/dev/null | grep '' || echo "（作業ツリーは清潔）"`
 
 ## 現在のブランチ
 
-!`b=$(git branch --show-current 2>/dev/null); [ -n "$b" ] && echo "$b" || echo "（検出不可——git リポジトリでないか detached HEAD）"`
+!`git branch --show-current 2>/dev/null | grep '' || echo "（検出不可——git リポジトリでないか detached HEAD）"`
 
 ## デフォルトブランチ
 
-!`d=$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name 2>/dev/null); [ -n "$d" ] && echo "$d" || echo "（取得不可——origin なしか gh が使えない）"`
+!`gh repo view --json defaultBranchRef --jq .defaultBranchRef.name 2>/dev/null | grep '' || echo "（取得不可——origin なしか gh が使えない）"`
 
 ## 既存タグ一覧（直近20件，命名規則と注釈の有無の把握用）
 
-!`t=$(git for-each-ref --sort=-creatordate --format='%(refname:short) %(objecttype)' refs/tags 2>/dev/null | head -20); [ -n "$t" ] && echo "$t" || echo "（タグなし）"`
+!`git for-each-ref --sort=-creatordate --format='%(refname:short) %(objecttype)' refs/tags 2>/dev/null | head -20 | grep '' || echo "（タグなし）"`
 
 ## 直近のタグ
 
-!`t=$(git describe --tags --abbrev=0 2>/dev/null); [ -n "$t" ] && echo "$t" || echo "（タグなし）"`
+!`git describe --tags --abbrev=0 2>/dev/null | grep '' || echo "（タグなし）"`
 
-## 前回タグ以降のコミットと変更ファイル
+## 前回タグ以降のコミットと変更ファイル（タグが無ければ全履歴．新しい順に100件まで）
 
-!`tag=$(git describe --tags --abbrev=0 2>/dev/null); if [ -n "$tag" ]; then r=$(git log --oneline --decorate --name-only "$tag..HEAD" 2>/dev/null); else r=$(git log --oneline --decorate --name-only -40 2>/dev/null); fi; [ -n "$r" ] && echo "$r" || echo "（コミットなし——初コミット前か，前回タグ以降に変更が無くリリース対象なし）"`
+!`git log --oneline --decorate --name-only -100 HEAD --not --tags 2>/dev/null | grep '' || echo "（コミットなし——初コミット前か，前回タグ以降に変更が無くリリース対象なし）"`
 
 ## About 欄の現状
 
-!`a=$(gh repo view --json description,homepageUrl,repositoryTopics 2>/dev/null); [ -n "$a" ] && echo "$a" || echo "（取得不可——origin なしか gh が使えない）"`
+!`gh repo view --json description,homepageUrl,repositoryTopics 2>/dev/null | grep '' || echo "（取得不可——origin なしか gh が使えない）"`
 
 ## 直近の bump コミット本文（書式の手本）
 
-!`tag=$(git describe --tags --abbrev=0 2>/dev/null); b=$([ -n "$tag" ] && git log -1 --format='%B' "$tag" 2>/dev/null); [ -n "$b" ] && echo "$b" || echo "（手本なし）"`
+!`git log --tags --no-walk -1 --format=%B 2>/dev/null | grep '' || echo "（手本なし）"`
 
 ## 直近のリリースノート（様式の手本）
 
-!`tag=$(git describe --tags --abbrev=0 2>/dev/null); n=$([ -n "$tag" ] && gh release view "$tag" 2>/dev/null); [ -n "$n" ] && echo "$n" || echo "（手本なし）"`
+!`gh release view 2>/dev/null | grep '' || echo "（手本なし）"`
 
 ## 手順
 
 1. **前提確認**：デフォルトブランチが判明し現在のブランチと異なれば，切り替えを促して中断する．作業ツリーが汚れていれば中断し /capstone:commit-changes を促す．origin があれば `git fetch origin` し，ブランチが遅れていれば中断して取り込みを促す——bump とタグの後で rebase すると，タグが元のコミットに取り残される．
 2. **リリース単位の判定**：バージョンフィールドを持つマニフェスト（`package.json`・`pyproject.toml`・`Cargo.toml`・`plugin.json` 等）をリポジトリ内で探す（`.claude-plugin/plugin.json` は，`.claude-plugin/` の親をマニフェストの置き場と読む）．ルート直下に一つだけなら**単一パッケージ**として扱う．複数のディレクトリにそれぞれマニフェストがあれば**マルチパッケージ**（monorepo）とみなし，マニフェストを持つ各ディレクトリを独立したリリース単位とする——単位の粒度が自明でなければ問う．以降の手順は単一パッケージなら全体で一件として，マルチパッケージなら単位ごとに独立して行う．
-3. **対象と上げ幅の判定**：各リリース単位について，バージョンの実体（マニフェストの `version` ＋その単位配下の全参照箇所）を特定し，不一致は編集対象として提案に含める．その単位の直近タグ以降に，配下の変更が無ければリリース対象から外す（マルチパッケージで対象が一つも無ければ何もしない）．上の「前回タグ以降のコミットと変更ファイル」は全体で最寄りの1タグしか見ないので，マルチパッケージでは単位ごとに `git log <単位の直近タグ>..HEAD -- <単位のパス>` で確かめる．
+3. **対象と上げ幅の判定**：各リリース単位について，バージョンの実体（マニフェストの `version` ＋その単位配下の全参照箇所）を特定し，不一致は編集対象として提案に含める．その単位の直近タグ以降に，配下の変更が無ければリリース対象から外す（マルチパッケージで対象が一つも無ければ何もしない）．上の「前回タグ以降のコミットと変更ファイル」はどの単位のタグかを区別しないので，マルチパッケージでは単位ごとに `git log <単位の直近タグ>..HEAD -- <単位のパス>` で確かめる．
    - **初版（タグ無し）**：上げ幅判定は不要；マニフェストの現バージョンをそのまま初タグとする．バージョンが仮値（0.0.0・0.1.0 等）なら適切な初版番号を問う．
    - **既タグあり**：その単位の直近タグ以降で，配下に触れた Conventional Commits から上げ幅を判定——破壊的→メジャー，`feat`→マイナー，`fix`/`perf`→パッチ；プレ 1.0 の破壊的はマイナーとする．1.0.0 昇格と，判断の割れる上げ幅は問う．`chore`・`style`・`docs` 等だけの単位は，見送るかを問う．複数単位にまたがるコミット（リネーム等）は触れた全単位の判定に算入する．マルチパッケージで単位ごとのタグの前例が無ければ，全体に打った既存タグ以前の変更は当該単位の初版に含めて扱ってよいか確認する．
 4. **提案**：対象単位ごとに bump コミット（件名＋本文）とタグ名・リリースノート（タイトル＋本文）を全文で提案し，上げ幅・新バージョン・編集対象を示す．マルチパッケージでは対象外の単位（変更無し，または上げ幅に当たる変更無しで見送り）も列挙し，見落としでないことを示す．About 欄（説明・website・topics）は現状を下の「文面の基準」の定めと突き合わせ，差分があれば新しい全文も提案する——リポジトリに一つの設定なので対象単位の数によらず高々一度扱う．既存の下書きを使う場合も全文を提示する．承認は全文に対して取る——下書きの在処を示すだけでは足りない．origin が無ければ，リモートリポジトリの作成（名前・About 欄・公開範囲）と origin 設定も提案に含める——承認前に作らない．「文面の基準」に従い，出す前に「固有の走査」を全件通し，**通した証跡を提案に添える**——照らした手本，裏取りした数値・URL，旧バージョンの残存を確かめた範囲を数行で．走査は成果物を残さないので，黙って飛ばしても外からは見えない；添えれば見える．通さなかった走査があれば，その旨と理由も書く．提案の時点の `git status --short`・`git rev-parse HEAD`・`git tag` の出力を控える．

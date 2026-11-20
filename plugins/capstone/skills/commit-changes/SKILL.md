@@ -5,21 +5,29 @@ description: 変更を意味単位のコミットに分割し，各メッセー�
 
 対象：作業ツリーの未コミット変更（追跡済みの差分と未追跡ファイル）と，それを記録するコミット群．
 
+## リポジトリ
+
+!`git rev-parse --show-toplevel 2>/dev/null | grep '' || echo "（git リポジトリではない）"`
+
 ## 現在の状態
 
-!`git rev-parse --git-dir >/dev/null 2>&1 || { echo "（git リポジトリではない）"; exit 0; }; s=$(git status --short); [ -n "$s" ] && echo "$s" || echo "（未コミットの変更なし——記録するものが無い）"`
+!`git status --short 2>/dev/null | grep '' || echo "（未コミットの変更なし——記録するものが無い）"`
 
-## 追跡済みの差分
+## 追跡済みの差分の要約
 
-!`d=$(git diff HEAD 2>/dev/null); n=$(echo "$d" | wc -l); if [ -z "$d" ]; then echo "（追跡済みの差分なし）"; elif [ "$n" -gt 2000 ]; then echo "（差分が $n 行あるので要約だけ示す——中身は手順2でパスを絞って読む）"; git diff HEAD --stat; else echo "$d"; fi`
+!`git diff HEAD --stat 2>/dev/null | grep '' || echo "（追跡済みの差分なし）"`
+
+## 追跡済みの差分（先頭の2000行まで——要約の行数がこれを超えるなら，続きは手順2でパスを絞って読む）
+
+!`git diff HEAD 2>/dev/null | head -2000 | grep '' || echo "（追跡済みの差分なし）"`
 
 ## 直近のコミットと，それが触れたファイル（type・scope の選び方の手本）
 
-!`l=$(git log --format='%h %s' --name-only -10 2>/dev/null); [ -n "$l" ] && echo "$l" || echo "（前例なし——コミットがまだ無い）"`
+!`git log --format='%h %s' --name-only -10 2>/dev/null | grep '' || echo "（前例なし——コミットがまだ無い）"`
 
 ## 直近のコミットの全文（声・言語・書式の手本）
 
-!`b=$(git log -5 --format='──── %h%n%B' 2>/dev/null); [ -n "$b" ] && echo "$b" || echo "（手本なし——コミットがまだ無い）"`
+!`git log -5 --format='──── %h%n%B' 2>/dev/null | grep '' || echo "（手本なし——コミットがまだ無い）"`
 
 ## 手順
 

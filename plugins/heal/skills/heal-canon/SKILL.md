@@ -5,17 +5,33 @@ description: 規則体系（全 SKILL.md と正典）の全体を見直し，溜
 
 対象：規則体系——全 SKILL.md と，それらが従う正典（BEAUTY.md・RUBRIC.md 等）．
 
-## 前回の見直しからの状態
+## リポジトリ
 
-!`git rev-parse --git-dir >/dev/null 2>&1 || { echo "（git リポジトリではない）"; exit 0; }; q(){ git -c core.quotepath=off ls-tree --full-tree -r -l "$r" | grep -E '(SKILL|BEAUTY|RUBRIC)\.md$' | { s=0; while read -r a b c z p; do s=$((s+z)); done; echo "$s"; }; }; h=$(git log --format='%h %s' 2>/dev/null | grep -m1 ' chore: review the canon$' | cut -d' ' -f1); [ -n "$h" ] || { echo "（見直しの記録なし）"; exit 0; }; r=$h; x=$(q); r=HEAD; y=$(q); echo "前回の見直し：$(git log -1 --format='%h %ad' --date=short "$h")"; echo "以降の定義の変更：$(git log --oneline "$h..HEAD" -- ':/*SKILL.md' ':/*BEAUTY.md' ':/*RUBRIC.md' | wc -l) 件"; echo "定義の量：$x → $y バイト"`
+!`git rev-parse --show-toplevel 2>/dev/null | grep '' || echo "（git リポジトリではない）"`
+
+## 前回の見直し
+
+!`git log -1 --format='%h %ad' --date=short ':/^chore: review the canon' 2>/dev/null | grep '' || echo "（見直しの記録なし）"`
+
+## 前回の見直し以降の定義の変更の件数（見直しの記録が無ければ 0）
+
+!`git log --oneline HEAD '^:/^chore: review the canon' -- ':/*SKILL.md' ':/*BEAUTY.md' ':/*RUBRIC.md' 2>/dev/null | grep -c '' || true`
+
+## 前回の見直しの時点の定義の量（バイト．見直しの記録が無ければ 0）
+
+!`git grep -h '' ':/^chore: review the canon' -- ':/*SKILL.md' ':/*BEAUTY.md' ':/*RUBRIC.md' 2>/dev/null | wc -c`
+
+## 現在の定義の量（バイト）
+
+!`git grep -h '' HEAD -- ':/*SKILL.md' ':/*BEAUTY.md' ':/*RUBRIC.md' 2>/dev/null | wc -c`
 
 ## 前回の見直しコミットの本文（持ち越しの在処）
 
-!`h=$(git log --format='%h %s' 2>/dev/null | grep -m1 ' chore: review the canon$' | cut -d' ' -f1); b=$([ -n "$h" ] && git log -1 --format=%B "$h" 2>/dev/null); [ -n "$b" ] && echo "$b" || echo "（持ち越しなし——見直しの記録が無い）"`
+!`git log -1 --format=%B ':/^chore: review the canon' 2>/dev/null | grep '' || echo "（持ち越しなし——見直しの記録が無い）"`
 
 ## 直近のコミットの全文（声・言語・書式の手本）
 
-!`b=$(git log -5 --format='──── %h%n%B' 2>/dev/null); [ -n "$b" ] && echo "$b" || echo "（手本なし——コミットがまだ無い）"`
+!`git log -5 --format='──── %h%n%B' 2>/dev/null | grep '' || echo "（手本なし——コミットがまだ無い）"`
 
 ## 手順
 
