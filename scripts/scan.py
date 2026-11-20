@@ -211,13 +211,13 @@ COPY_TOTAL = 131
 
 DATE = re.compile(r"(?<!\d)20\d{2}[-/年]\d{1,2}")
 # 環境語を許す配布文書．ops は環境の操作そのものを担い，commit-changes・
-# release-version・refine-docs はツールの注入やハーネスの値を規則の対象として語る．
-# 他は環境に依存させない．
+# release-version と refine-docs の skill-md.md は，ツールの注入やハーネスの値を
+# 規則の対象として語る．他は環境に依存させない．
 ENV_EXEMPT = (
     "plugins/ops/skills/*/SKILL.md",
     "plugins/capstone/skills/commit-changes/SKILL.md",
     "plugins/capstone/skills/release-version/SKILL.md",
-    "plugins/refine/skills/refine-docs/SKILL.md",
+    "plugins/refine/skills/refine-docs/skill-md.md",
 )
 ENV_WORDS = re.compile(
     r"Bash|PowerShell|Monitor|PushNotification|Remote Control|VS Code"
@@ -610,7 +610,7 @@ def check_dynamic_context(plugins: set[str]) -> int:
     """SKILL.md の各 !`...` が exit 0 かつ非空の出力を返すか．
 
     非ゼロ終了はスキルの呼び出しごと止める（refine:refine-docs の
-    「媒体の正典」）．exit 0 でも出力が空になることはある——タグが HEAD に
+    skill-md.md）．exit 0 でも出力が空になることはある——タグが HEAD に
     あるとき `git log "$tag..HEAD"` は成功しつつ何も返さず，`|| echo "（なし）"`
     の代替文は発火しない．空の節は何を示すのか読み手に分からないので，
     非空であることも併せて要求する．走査したコマンドの数を返す．
