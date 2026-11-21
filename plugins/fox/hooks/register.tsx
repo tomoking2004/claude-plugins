@@ -187,7 +187,11 @@ export const register: Register = on => {
   })
 
   on('command.run', { command: 'fox' }, async $ => {
-    await open($)
+    const opened = await open($)
+    // 開いても，描く画面が無いときなどは置かれない．置かれなかったら，その理由を伝える．
+    if (!opened.isPlaced) {
+      return { text: `キツネのパネルを開いたが，画面に置かれていない：${opened.reason}` }
+    }
 
     return { text: 'キツネのパネルを開いた．' }
   })

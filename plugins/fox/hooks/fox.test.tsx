@@ -22,11 +22,14 @@ const COVERS = [['#964034'], ['#345b96']]
 const SPRITE = (name: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg"><style>.a{stroke:#964034}.layer{animation-delay:0s}</style><title>${name}</title></svg>`
 
-/** エンジンの代わり：プラグインが呼ぶ時計・ファイル・コンテキストの使用率・エージェントの一覧・小さなモデルに答える． */
+/** エンジンの代わり：プラグインが呼ぶ時計・パネル・ファイル・コンテキストの使用率・エージェントの一覧・小さなモデルに答える． */
 const world = (on: On, usage = { percent: 10 }) => {
   const clock = mock.clock(on, { now: 100_000 })
   on('command.register', () => ({ value: { command: 'fox' } }))
-  on('ui.open', () => ({ value: { isPlaced: true } }))
+  const pane = { reason: '' } // 空なら置かれ，そうでなければ，その理由で置かれない
+  on('ui.open', () => ({
+    value: pane.reason === '' ? { isPlaced: true } : { isPlaced: false, reason: pane.reason },
+  }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('tool.call', () => ({ result: {} }))
   const agents: AgentInfo[] = []
@@ -54,7 +57,7 @@ const world = (on: On, usage = { percent: 10 }) => {
       : SPRITE(e.path.split('/').pop() ?? ''),
   }))
 
-  return { clock, usage, agents, names }
+  return { clock, usage, agents, names, pane }
 }
 
 /** パネルに並ぶキツネの，読み上げ用の文（本体か分身か：役割）と絵を返す． */
@@ -88,6 +91,18 @@ const notify = async ($: Engine, text: string) => {
 }
 
 const start = ($: Engine) => $.session.start({ cwd: '/', surface: 'vscode', isInteractive: true })
+
+/** ユーザーが `/fox` を打ち，返ってきた文を返す． */
+const open = async ($: Engine) => {
+  const answer = await $.command.run({
+    command: 'fox',
+    args: '',
+    origin: { kind: 'composer' },
+    presentation: { isFullscreen: false, columns: 80 },
+  })
+
+  return answer.text
+}
 
 test('本体は，最後に使ったツールの役割を次のツールまで続ける', async ($, on) => {
   const { clock } = world(on)
@@ -337,6 +352,15 @@ test('本体の眠気はコンテキストの使用率で決まり，圧縮で�
   usage.percent = 20
   await $.classic.PostCompact({ trigger: 'manual', compact_summary: '' })
   expect((await foxes($))[0]?.source).toContain('main-research-0.svg')
+})
+
+test('/fox は，パネルが置かれなかったら，その理由を伝える', async ($, on) => {
+  const { pane } = world(on)
+  await start($)
+  expect(await open($)).toBe('キツネのパネルを開いた．')
+
+  pane.reason = 'no-surface: no surface is attached ($.session.surfaces() is empty)'
+  expect(await open($)).toBe(`キツネのパネルを開いたが，画面に置かれていない：${pane.reason}`)
 })
 
 test('端末では，役割を文字で並べる', async ($, on) => {
