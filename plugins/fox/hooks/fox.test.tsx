@@ -22,8 +22,8 @@ const COVERS = [['#964034'], ['#345b96']]
 const SPRITE = (name: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg"><style>.a{stroke:#964034}.layer{animation-delay:0s}</style><title>${name}</title></svg>`
 
-/** エンジンの代わり：プラグインが呼ぶ時計・パネル・ファイル・コンテキストの使用率・エージェントの一覧・小さなモデルに答える． */
-const world = (on: On, usage = { percent: 10 }) => {
+/** エンジンの代わり：プラグインが呼ぶ時計・パネル・ファイル・コンテキストの量・エージェントの一覧・小さなモデルに答える． */
+const world = (on: On, usage = { tokens: 10_000 }) => {
   const clock = mock.clock(on, { now: 100_000 })
   on('command.register', () => ({ value: { command: 'fox' } }))
   const pane = { reason: '' } // 空なら置かれ，そうでなければ，その理由で置かれない
@@ -49,7 +49,7 @@ const world = (on: On, usage = { percent: 10 }) => {
   on('classic.PostToolUse', () => ({}))
   on('classic.PostCompact', () => ({}))
   on('session.usage', () => ({
-    value: { startedAt: 0, context: { window: 200_000, percent: usage.percent }, rateLimits: [] },
+    value: { startedAt: 0, context: { window: 1_000_000, tokens: usage.tokens }, rateLimits: [] },
   }))
   on('fs.read', (_, e) => ({
     value: e.path.endsWith('index.json')
@@ -343,13 +343,14 @@ test('許可を待つ分身は，本体の次へ寄る', async ($, on) => {
   expect((await foxes($)).map(fox => fox.alt)).toEqual(['本体：考える', '分身：考える', '分身：実行する'])
 })
 
-test('本体の眠気はコンテキストの使用率で決まり，圧縮で使用率が下がれば目覚める', async ($, on) => {
-  const { usage } = world(on, { percent: 90 })
+test('本体の眠気は窓の大きさによらずトークン数で決まり，圧縮で減れば目覚める', async ($, on) => {
+  // 100万の窓の25%でも，眠気は最も深い．
+  const { usage } = world(on, { tokens: 250_000 })
   await start($)
   await $.tool.call({ tool: 'Read', file_path: '/a' })
   expect((await foxes($))[0]?.source).toContain('main-research-3.svg')
 
-  usage.percent = 20
+  usage.tokens = 20_000
   await $.classic.PostCompact({ trigger: 'manual', compact_summary: '' })
   expect((await foxes($))[0]?.source).toContain('main-research-0.svg')
 })
@@ -380,5 +381,7 @@ test('絵の下の一言は，幅に収まらなければ切る（全角は2字�
 })
 
 test('眠気の段階の境目', () => {
-  expect([undefined, 49, 50, 69, 70, 84, 85, 100].map(den.sleepinessOf)).toEqual([0, 0, 1, 1, 2, 2, 3, 3])
+  expect(
+    [undefined, 99_999, 100_000, 149_999, 150_000, 199_999, 200_000, 900_000].map(den.sleepinessOf),
+  ).toEqual([0, 0, 1, 1, 2, 2, 3, 3])
 })

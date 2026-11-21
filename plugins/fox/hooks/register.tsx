@@ -90,10 +90,10 @@ const change = async (
   timer = ms === undefined ? undefined : $.clock.after(ms + 1, () => void change($, den.flushed))
 }
 
-/** 本体の眠気を，いまのコンテキストの使用率に合わせる． */
+/** 本体の眠気を，いまのコンテキストの量に合わせる． */
 const drowsy = async ($: EngineInterface): Promise<(was: Den) => Den> => {
   const { context } = await $.session.usage()
-  const sleepiness = den.sleepinessOf(context.percent)
+  const sleepiness = den.sleepinessOf(context.tokens)
 
   return was => (was.sleepiness === sleepiness ? was : { ...was, sleepiness })
 }
@@ -280,7 +280,7 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // 圧縮を終えたら，眠気を測り直す（使用率が50%を下回っていれば目覚める）．
+  // 圧縮を終えたら，眠気を測り直す（量が減っていれば，減った後の段階へ戻る）．
   on('classic.PostCompact', async ($, e, next) => {
     const sleepy = await drowsy($)
     await change($, sleepy)

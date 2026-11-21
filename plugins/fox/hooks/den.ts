@@ -183,9 +183,14 @@ export const brief = (label: string, width: number): string => {
   return `${kept.join('')}…`
 }
 
-/** コンテキストの使用率（0〜100）から，本体の眠気の段階を決める． */
-export const sleepinessOf = (percent: number | undefined): number =>
-  percent === undefined || percent < 50 ? 0 : percent < 70 ? 1 : percent < 85 ? 2 : 3
+// 眠気の段階が上がるコンテキストの量．窓に対する割合でなくトークン数で決める——Claude の精度は量につれて落ち，
+// 100万の窓で割合を取ると，眠くなるのが遅すぎる．段階2の始まりの15万は，baton が新しいセッションへ
+// 移ることを勧める量に合わせる．
+const DROWSY = [100_000, 150_000, 200_000]
+
+/** コンテキストのトークン数から，本体の眠気の段階を決める． */
+export const sleepinessOf = (tokens: number | undefined): number =>
+  tokens === undefined ? 0 : DROWSY.filter(edge => tokens >= edge).length
 
 /** 絵のファイル名（拡張子を除く）．眠気は本体だけが持ち，「眠る」には段階が無い． */
 export const spriteOf = (den: Den, fox: Fox): string => {

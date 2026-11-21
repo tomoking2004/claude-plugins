@@ -12,7 +12,7 @@ import type { Band, Cue, Handoff, Kept, Offers } from '../types'
 
 const COMMAND = 'baton'
 // 勧め始めるコンテキストの量．窓に対する割合でなくトークン数で決める——Claude の精度は量につれて落ち，
-// 100万の窓で割合を取ると，勧めるのが遅すぎる．
+// 100万の窓で割合を取ると，勧めるのが遅すぎる．fox の眠気の段階2も，この量に合わせてある．
 const THRESHOLD = 150_000
 const TOAST_MS = 15_000
 // 新しいセッションの入力欄はすぐには用意されないので，入るまで間を置いて試し直す．
