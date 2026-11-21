@@ -13,6 +13,7 @@
     { "name": "ops", "source": "./plugins/ops" },
     { "name": "forge", "source": "./plugins/forge" },
     { "name": "fox", "source": "./plugins/fox" },
+    { "name": "baton", "source": "./plugins/baton" },
     { "name": "heal", "source": "./plugins/heal" }
   ]
 }

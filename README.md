@@ -29,15 +29,16 @@ Claude と Claude Code のプラグインのマーケットプレイス．構想
 | ops | 長い実行の起動・監視と痕跡の掃除を担う | 運用の局面 | /ops:run-job ・ /ops:check-job ・ /ops:clean-traces |
 | forge | 既存のスキルを調べて比べ，新しいスキルを作る | 作る定義 | /forge:distill-skill |
 | fox | Claude とその分身（サブエージェント）が働く様子を，ドット絵のキツネでパネルに映す | — | —（`/fox` でパネルを開く） |
+| baton | 会話が長くなったら新しいセッションへ移ることを勧め，引き継ぎ文を渡す | — | —（`/baton` で引き継ぎ文を書く） |
 | heal | 失敗の原因を診断して定義を直す | 治療の対象 | /heal:heal-skill ・ /heal:heal-canon |
 
 `→` は工程の順（assignment では委譲の向き），`・` は同列を表す．
 
-プラグイン＝成長の軸，スキル＝軸上の点．スキルを増やすことは既存の軸に点を足すこと，プラグインを増やすことは新しい軸を立てることに対応する．どの軸にも乗らないスキルが現れたときだけ軸を新設する．fox だけはスキルを持たず，Claude Code の画面拡張（mod）から成る．
+プラグイン＝成長の軸，スキル＝軸上の点．スキルを増やすことは既存の軸に点を足すこと，プラグインを増やすことは新しい軸を立てることに対応する．どの軸にも乗らないスキルが現れたときだけ軸を新設する．fox と baton はスキルを持たず，Claude Code の画面拡張（mod）から成る．
 
 ## 導入
 
-capstone と assignment は美の仕上げを refine のスキルへ委譲する．heal と fox 以外の全プラグインは失敗時に /heal:heal-skill を呼ぶ．依存先（refine・heal）は各 `plugin.json` の `dependencies` に宣言してある．
+capstone と assignment は美の仕上げを refine のスキルへ委譲する．heal・fox・baton 以外の全プラグインは失敗時に /heal:heal-skill を呼ぶ．依存先（refine・heal）は各 `plugin.json` の `dependencies` に宣言してある．
 
 ### Claude Code
 
@@ -52,6 +53,7 @@ capstone と assignment は美の仕上げを refine のスキルへ委譲する
 /plugin install ops@tomoking2004
 /plugin install forge@tomoking2004
 /plugin install fox@tomoking2004
+/plugin install baton@tomoking2004
 /plugin install heal@tomoking2004
 ```
 
@@ -66,7 +68,7 @@ forge は実行評価を Anthropic 公式の skill-creator へ委譲する．ski
 Claude（claude.ai とデスクトップアプリのチャット・Cowork）では，有料プランで次の順に追加する．
 
 1. Customize > Plugins > Add > Add marketplace に `tomoking2004/claude-plugins` を入れる．
-2. 使うプラグインを追加する．capstone・ops・fox は Claude Code 専用で，Claude には追加できない．capstone は手元のリポジトリを，ops は手元のマシンを扱い，fox は Claude Code の画面にパネルを足すからである．
+2. 使うプラグインを追加する．capstone・ops・fox・baton は Claude Code 専用で，Claude には追加できない．capstone は手元のリポジトリを，ops は手元のマシンを扱う．fox と baton は Claude Code の画面拡張（パネルと入力欄の上の帯）で，チャットでは働かない．
 3. 依存先も手で追加する（assignment には refine と heal，他のプラグインには heal）．Claude では `dependencies` が効かない．
 
 追加したプラグインは，同じアカウントでサインインした Claude Code にも同期される．その Claude Code に同名のプラグインを `/plugin install` で導入して有効にしてあれば，導入した版が優先される．
@@ -93,6 +95,7 @@ Claude（claude.ai とデスクトップアプリのチャット・Cowork）で�
 | Claude Code の履歴を消す | このマシンに溜まった履歴・痕跡を，/ops:clean-traces が何を消すか列挙して承認を得たうえで掃除する——ログイン・設定・導入済みプラグイン・自動メモリは残す |
 | 新しいスキルを作る | /forge:distill-skill が類似の既存スキルを調べて比べ，取捨を決めてから，実行評価を skill-creator へ委譲する |
 | 待ち時間を楽しく過ごす | fox を導入すると，Claude とその分身（サブエージェント）が働く様子を，キツネのアニメーションがパネルに映す．VS Code・デスクトップアプリ・モバイルではパネルが自動で開く．端末では自動で開かず，`/fox` で開くと，絵の代わりに役割が文字で並ぶ．閉じたパネルも `/fox` で開き直す．キツネの絵の下には，受けている指示を表す一言が出る．Claude 自身の一言は，依頼（スラッシュコマンドを除く）を送るたびに，小さなモデルを1回呼び出して付ける．パネルを開いていなくても呼び出しは走り，その費用はセッションに計上される．絵と仕組みは [plugins/fox/DESIGN.md](plugins/fox/DESIGN.md) が定める |
+| 会話が長くなったら新しいセッションへ移る | baton を導入すると，コンテキストが15万トークンに達した返答の区切りと，会話が自動で要約されたあとの区切りで1回ずつ，入力欄の上の帯が新しいセッションへ移ることを勧める．帯は閉じるか，`/baton` か `/clear` を走らせるまで残る．勧めはユーザーにだけ出し，Claude には伝えない．`/baton` を走らせると，いまの会話を受け継いだモデルの呼び出し（分岐）が引き継ぎ文（目的・決めたこと・済んだこと・確かめていないこと・次の一手・読むもの）を書き，baton がそれをクリップボードに写す．同じプロジェクトで新しいセッションを開くと，引き継ぎ文が入力欄に下書きとして入る（打ちかけの下書きは上書きしない）．分岐は Claude をもう1回呼び出すので，その分の費用がかかる |
 | 失敗したスキルを直す | /heal:heal-skill が定義を更新し再発を防ぐ |
 | 定義全体を手入れする | 溜まった重複と食い違いを，/heal:heal-canon が定義全体を見直して解消する |
 
@@ -107,7 +110,7 @@ Claude（claude.ai とデスクトップアプリのチャット・Cowork）で�
 - スキル名は組み込みコマンド名（/context ・ /review ・ /init ・ /status 等）と一致させず，プラグインをまたいでも重複させない——素の名前（名前空間を除いた名前）はマーケットプレイス全体で一意に保つ．プラグインのスキルは `/<plugin>:<skill>` のほか素の名前でも呼べるが，素の名前が効くのは他のコマンドがその名を使っていないときだけである．
 - スキル名は「動詞-目的語」の形（refine-code・heal-skill）にそろえ，素の名前だけで役目が分かるようにする．先頭に置ける動詞は scan.py の `SKILL_VERBS` が持つ．
 - スキル内の相対リンクはプラグイン境界を越えられない——導入時はプラグインごとに `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/` へ個別展開されるため，他プラグインのファイルを指す `../../../` は解決しない（このリポジトリ上では通るので気づきにくい）．他プラグインの規則に従わせるには，パス参照ではなくそのプラグインのスキルへ委譲し，`dependencies` に宣言する．
-- 画面拡張（mod）は，`hooks/hooks.json` が名指す TypeScript のモジュールに置く．fox がその唯一の例である．確かめ方と絵の書き出しの手順は [plugins/fox/DESIGN.md](plugins/fox/DESIGN.md) が定める．
+- 画面拡張（mod）は，`hooks/hooks.json` が名指す TypeScript のモジュールに置く．fox と baton がその例である．fox の確かめ方と絵の書き出しの手順は [plugins/fox/DESIGN.md](plugins/fox/DESIGN.md) が定める．baton のアイコン（`.claude-plugin/icon.png`）は [plugins/baton/art/icon.py](plugins/baton/art/icon.py) が描くので，手で直さない．
 - 配布する定義を直す先は常にこのリポジトリ．導入済みの実体（`cache` 配下）を書き換えても，プラグインの更新で上書きされて消える——/heal:heal-skill もこの区別に従う．利用者固有の好み・事実は配布する定義でなく，利用者のプロジェクト側に置く．
 
 ### 美の基準
@@ -121,7 +124,7 @@ Claude（claude.ai とデスクトップアプリのチャット・Cowork）で�
 ### Claude への対応
 
 - Claude でも使うプラグインは，チャットでも読み込まれる部品（スキル）で組む——hooks と agents はチャットでは無視される．
-- プラグインの最上位に `bin/` があると，Claude はそのプラグインを追加できない．Claude Code 専用のプラグイン（capstone・ops・fox）にだけ `bin/` を置く．`plugin.json` には対応先（Claude か Claude Code か）を宣言する項目が無いので，`bin/` で追加を止める．
+- プラグインの最上位に `bin/` があると，Claude はそのプラグインを追加できない．Claude Code 専用のプラグイン（capstone・ops・fox・baton）にだけ `bin/` を置く．`plugin.json` には対応先（Claude か Claude Code か）を宣言する項目が無いので，`bin/` で追加を止める．
 - `dependencies` は `<plugin>@<marketplace>` の形で書く．Claude から同期された版はマーケットプレイスに属さない．Claude Code の公式文書は，その版の依存が満たされる条件を，マーケットプレイス名付きの指定についてしか定めていない．
 - スキルの外にあるプラグイン内の文書（BEAUTY.md 等）も，チャットで読める——実機で確かめた挙動である．
 

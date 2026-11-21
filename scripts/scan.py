@@ -240,7 +240,7 @@ ENV_WORDS = re.compile(
     r"|サブエージェント|ハーネス"
 )
 # Claude Code 専用のプラグイン．プラグインの最上位の bin/ が Claude への追加を止める．
-CLAUDE_CODE_ONLY = {"capstone", "fox", "ops"}
+CLAUDE_CODE_ONLY = {"baton", "capstone", "fox", "ops"}
 
 violations: list[str] = []
 
