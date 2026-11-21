@@ -168,14 +168,17 @@ export const lined = (den: Den): Fox[] => {
 
 const widthOf = (ch: string): number => (ch.charCodeAt(0) > 0xff ? 2 : 1)
 
-/** 絵の下に書く一言を1行に詰め，幅（半角1字を1，全角1字を2と数える）に収まらなければ切る． */
+/** 文字列の幅（半角1字を1，全角1字を2と数える）． */
+export const widthOfText = (text: string): number =>
+  [...text].reduce((sum, ch) => sum + widthOf(ch), 0)
+
+/** 絵の下に書く一言を1行に詰め，幅（`widthOfText` の数え方）に収まらなければ切る． */
 export const brief = (label: string, width: number): string => {
-  const chars = [...label.split(/\s+/).join(' ').trim()]
-  const total = chars.reduce((sum, ch) => sum + widthOf(ch), 0)
-  if (total <= width) return chars.join('')
+  const line = label.split(/\s+/).join(' ').trim()
+  if (widthOfText(line) <= width) return line
 
   let spent = 1 // 末尾の「…」の分
-  const kept = chars.filter(ch => (spent += widthOf(ch)) <= width)
+  const kept = [...line].filter(ch => (spent += widthOf(ch)) <= width)
 
   return `${kept.join('')}…`
 }

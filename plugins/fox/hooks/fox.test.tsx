@@ -218,6 +218,32 @@ test('モデルが答えなければ，依頼の文をそのまま一言にす�
   expect(await captions($)).toEqual(['表を 足して'])
 })
 
+test('モデルが依頼そのものに答えたら，その返事は一言にせず，依頼の文を使う', async ($, on) => {
+  const { clock, names } = world(on)
+  names.text = 'Bashの実行環境がないため、pwdを実際に実行することはできません。ターミナルで `pwd` と入力してください。'
+  await start($)
+  await say($, 'Bash で pwd を実行して')
+  await clock.settle()
+  expect(await captions($)).toEqual(['Bash で pwd を実行して'])
+
+  // 短くても，句点で終わる返事は捨てる．
+  names.text = '実行しました。'
+  await say($, 'ls を実行して')
+  await clock.settle()
+  expect(await captions($)).toEqual(['ls を実行して'])
+
+  // 句点で終わらなくても，幅が半角24字を超える返事は捨てる．ちょうど24字なら一言にする．
+  names.text = '設計文書と実装の照合の確認'
+  await say($, 'もう一度')
+  await clock.settle()
+  expect(await captions($)).toEqual(['もう一度'])
+
+  names.text = '設計文書と実装の照合確認'
+  await say($, 'さらにもう一度')
+  await clock.settle()
+  expect(await captions($)).toEqual(['設計文書と実装の照合確認'])
+})
+
 test('絵は匹数によらず同じ大きさで，入力欄の上のパネルでは一段小さい', async ($, on) => {
   world(on)
   await start($)
