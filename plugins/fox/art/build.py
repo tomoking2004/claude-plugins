@@ -253,14 +253,18 @@ def preview(out: Path) -> None:
             fr.alpha_composite(tile, spot)
         sheet.append(fr.convert("RGB"))
 
-    # 色を減らさない：全ての刻みの色をそのまま並べたパレットを使う．
+    # 色を減らさない：全ての刻みの色をそのまま並べたパレットに，1ドットずつ引き当てる
+    # （quantize は近い色を取り違える）．
     colors = sorted({c for fr in sheet for _, c in fr.getcolors(1 << 16)})
     assert len(colors) <= 256, len(colors)
-    pal = Image.new("P", (1, 1))
-    spare = 768 - 3 * len(colors)
-    pal.putpalette([v for c in colors for v in c] + [0] * spare)
-    frames = [fr.quantize(palette=pal, dither=Image.Dither.NONE)
-              for fr in sheet]
+    index = {c: i for i, c in enumerate(colors)}
+    palette = [v for c in colors for v in c]
+    frames = []
+    for fr in sheet:
+        dots = bytes(index[c] for c in fr.getdata())
+        im = Image.frombytes("P", size, dots)
+        im.putpalette(palette)
+        frames.append(im)
     frames[0].save(out, save_all=True, append_images=frames[1:],
                    duration=draw.TICK, loop=0)
     print("preview:", out)
