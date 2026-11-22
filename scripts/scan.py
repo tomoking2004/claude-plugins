@@ -217,23 +217,27 @@ COPIES = {
         "誤った規則は，理由を残さないと復活する．"
         "ユーザーの言葉と個別の実例は写さない．"
     ),
+    "マーケットプレイスの README": (
+        "手順はマーケットプレイスの README（リポジトリ最上位の README.md）が定める．"
+    ),
 }
 # これより短い一致は，語句の偶然の一致と見分けがつかない．
 COPY_MIN = 30
 # 写しの件数の控え．キーの語ごと書き換えた写しは照合を逃れ，件数の減りにだけ現れる．
-COPY_TOTAL = 140
+COPY_TOTAL = 149
 
 DATE = re.compile(r"(?<!\d)20\d{2}[-/年]\d{1,2}")
 # 環境語を許す配布文書．ops は環境の操作そのものを担い，commit-changes・
 # release-version と refine-docs の skill-md.md は，ツールの注入やハーネスの値を
 # 規則の対象として語る．fox は Claude Code のツールとサブエージェントの働きを
-# 絵にするのが役目である．他は環境に依存させない．
+# 絵にするのが役目で，README もその働きを語る．他は環境に依存させない．
 ENV_EXEMPT = (
     "plugins/ops/skills/*/SKILL.md",
     "plugins/capstone/skills/commit-changes/SKILL.md",
     "plugins/capstone/skills/release-version/SKILL.md",
     "plugins/refine/skills/refine-docs/skill-md.md",
     "plugins/fox/DESIGN.md",
+    "plugins/fox/README.md",
 )
 ENV_WORDS = re.compile(
     r"Bash|PowerShell|Monitor|PushNotification|Remote Control|VS Code"
@@ -241,6 +245,11 @@ ENV_WORDS = re.compile(
 )
 # Claude Code 専用のプラグイン．プラグインの最上位の bin/ が Claude への追加を止める．
 CLAUDE_CODE_ONLY = {"baton", "capstone", "fox", "ops"}
+# 最上位の README が名指してよいプラグイン．refine は美の基準を，heal は定義の
+# 治療を，プラグインをまたいで担う．紹介は，どのプラグインも自分の README が持つ．
+SHARED = {"heal", "refine"}
+# 各プラグインの README が必ず持つ節．
+README_SECTIONS = ("導入", "使い方")
 
 violations: list[str] = []
 
@@ -437,6 +446,55 @@ def check_articles() -> int:
             if n != declared:
                 fail(rel(md), f"「{n}条」が条の数 {declared} と食い違う")
     return count
+
+
+def check_readmes(plugins: set[str]) -> int:
+    """紹介が各プラグインの README にあり，最上位の README に無いか．
+
+    各 README は，表題がプラグイン名で，冒頭の段落が plugin.json の description
+    と一致し，README_SECTIONS の節を持つ．「導入」の対応先は CLAUDE_CODE_ONLY と，
+    依存先は `dependencies` と一致する．最上位の README は，コードフェンスの
+    中でも SHARED 以外のプラグインを名指さない——名指さなければ，プラグインを
+    足しても最上位を直さずに済む．走査した README の数を返す．
+    """
+    count = 0
+    for name in sorted(plugins):
+        root = REPO / "plugins" / name
+        path = root / "README.md"
+        if not path.exists():
+            fail(rel(root), "README.md が無い")
+            continue
+        count += 1
+        manifest = root / ".claude-plugin" / "plugin.json"
+        m = json.loads(manifest.read_text(encoding="utf-8"))
+        text = prose(path)
+        blocks = [b.strip() for b in re.split(r"\n\s*\n", text) if b.strip()]
+        if blocks[:2] != [f"# {name}", m.get("description")]:
+            fail(rel(path), "表題と冒頭の段落が，プラグイン名と description でない")
+        for section in README_SECTIONS:
+            if not re.search(rf"^## {section}$", text, flags=re.M):
+                fail(rel(path), f"「{section}」の節が無い")
+        intro = re.search(r"^## 導入$(.*?)(?=^## |\Z)", text, flags=re.M | re.S)
+        lines = intro[1].splitlines() if intro else []
+        only = name in CLAUDE_CODE_ONLY
+        support = "Claude Code 専用．" if only else "Claude Code と Claude．"
+        if not any(line.startswith(f"- **対応先**：{support}") for line in lines):
+            fail(rel(path), f"対応先が「{support}」で始まらない")
+        targets = [
+            str(dep).partition("@")[0] for dep in m.get("dependencies", [])
+        ]
+        declared = "・".join(targets) or "なし"
+        if f"- **依存先**：{declared}" not in lines:
+            fail(rel(path), f"依存先の行が dependencies（{declared}）と食い違う")
+
+    top = REPO / "README.md"
+    text = top.read_text(encoding="utf-8")
+    for name in sorted(SHARED - plugins):
+        fail(SELF, f"SHARED の {name} がプラグインに無い")
+    for name in sorted(plugins - SHARED):
+        if re.search(rf"(?<![A-Za-z]){name}(?![A-Za-z])", text):
+            fail(rel(top), f"プラグイン {name} を名指している")
+    return count + 1
 
 
 def check_copies() -> int:
@@ -735,6 +793,7 @@ def main() -> int:
         "スキル": check_skills(plugins),
         "リンク": check_links(),
         "条の参照": check_articles(),
+        "紹介": check_readmes(plugins),
         "定型文": check_copies(),
         "写しの断片": check_unlisted_copies(),
         "強調": check_emphasis(),
