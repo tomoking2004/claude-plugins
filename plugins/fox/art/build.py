@@ -1,11 +1,13 @@
 """キツネの絵を書き出す．
 
-使い方：python build.py [プレビュー.gif]
+使い方：python build.py [確かめ用.gif]
 
 - ../sprites/：パネルが流すアニメーション SVG（役割ごと．本体は眠気の段階ごと）と，
   個体ごとの表紙の色の一覧 index.json．必ず作り直す．
 - ../.claude-plugin/icon.png：プラグインの一覧に出るアイコン．必ず作り直す．
-- プレビュー.gif：全役割を並べた1枚（黒背景）．絵を目で確かめるためのもので，
+- ../preview.gif：README に載せる，本体の働く6つの役割を並べた1枚（透過）．
+  必ず作り直す．
+- 確かめ用.gif：全役割を並べた1枚（黒背景）．絵を目で確かめるためのもので，
   パスを渡したときだけ作る．
 
 Pillow が要る．
@@ -26,6 +28,7 @@ Dot = tuple[Ticks, Point, Color]
 
 SPRITES = draw.ART.parent / "sprites"
 ICON = draw.ART.parent / ".claude-plugin" / "icon.png"
+README_PREVIEW = draw.ART.parent / "preview.gif"
 LIMIT = 131072          # パネルが受け取る SVG の上限（文字数）
 PERIOD = draw.N * draw.TICK / 1000
 
@@ -227,52 +230,75 @@ def icon() -> None:
     print("icon:", ICON.name)
 
 
-# ── プレビュー ────────────────────────────────────────
+# ── 並べた GIF ────────────────────────────────────────
 
-def preview(out: Path) -> None:
-    """全役割を黒背景に並べた GIF を書き出す．絵には説明の文字を入れない．
+def sheet(
+    out: Path, tiles: list[list[Image.Image]],
+    scale: int, cols: int, pad: int, margin: int, bg: Color | None,
+) -> None:
+    """48刻みの絵を幾つか並べた GIF を書き出す．絵には説明の文字を入れない．
+
+    絵を cols 個ずつ折り返して並べ，絵の間を pad，外周を margin ドット空けて，
+    全体を scale 倍にする．bg が None なら背景を透過にする．
+    """
+    lines = (len(tiles) + cols - 1) // cols
+    size = (cols * (64 + pad) - pad + 2 * margin,
+            lines * (64 + pad) - pad + 2 * margin)
+    shots = []
+    for t in range(draw.N):
+        fr = Image.new("RGBA", size, bg or (0, 0, 0, 0))
+        for i, tile in enumerate(tiles):
+            spot = (margin + (i % cols) * (64 + pad),
+                    margin + (i // cols) * (64 + pad))
+            fr.alpha_composite(tile[t], spot)
+        shots.append(fr)
+
+    # 色を減らさない：全ての刻みの色をそのまま並べたパレットに，1ドットずつ引き当てる
+    # （quantize は近い色を取り違える）．透過にするなら，0番を透明に充てる．
+    colors = sorted({c for fr in shots
+                     for _, c in fr.getcolors(1 << 16) if c[3]})
+    clear = bg is None
+    first = 1 if clear else 0
+    assert first + len(colors) <= 256, len(colors)
+    index = {c: first + i for i, c in enumerate(colors)}
+    palette = [0, 0, 0] * first + [v for c in colors for v in c[:3]]
+    frames = []
+    for fr in shots:
+        dots = bytes(index[c] if c[3] else 0 for c in fr.getdata())
+        im = Image.frombytes("P", size, dots)
+        im.putpalette(palette)
+        frames.append(im.resize((size[0] * scale, size[1] * scale),
+                                Image.NEAREST))
+    extra = {"transparency": 0, "disposal": 2} if clear else {}
+    frames[0].save(out, save_all=True, append_images=frames[1:],
+                   duration=draw.TICK, loop=0, **extra)
+    print("%s: %d KB" % (out.name, out.stat().st_size // 1024))
+
+
+def readme_preview() -> None:
+    """README に載せる GIF を書き出す：本体の働く6つの役割を，透過の背景に1段で並べる．"""
+    tiles = [draw.frames(make, False) for make in draw.ROLES.values()]
+    sheet(README_PREVIEW, tiles, scale=2, cols=len(tiles), pad=8, margin=0,
+          bg=None)
+
+
+def check_preview(out: Path) -> None:
+    """確かめ用の GIF を書き出す：全役割を黒背景に並べる．
 
     1段目は本体の，2段目は分身の，働く6つの役割．3段目は本体の眠気の段階0〜3（調べる役割で
     見せる）と，本体・分身の「眠る」．
     """
-    scale, cols, pad, bg = 4, 6, 12, (0, 0, 0, 255)
-    cell = 64 * scale
-    rows = [draw.frames(make, leaf)
-            for leaf in (False, True) for make in draw.ROLES.values()]
-    rows += [draw.frames(draw.research, False, level) for level in draw.LEVELS]
-    rows += [draw.frames(draw.rest, leaf) for leaf in (False, True)]
-
-    lines = (len(rows) + cols - 1) // cols
-    size = (cols * (cell + pad) + pad, lines * (cell + pad) + pad)
-    sheet = []
-    for t in range(draw.N):
-        fr = Image.new("RGBA", size, bg)
-        for i, frames in enumerate(rows):
-            spot = (pad + (i % cols) * (cell + pad),
-                    pad + (i // cols) * (cell + pad))
-            tile = frames[t].resize((cell, cell), Image.NEAREST)
-            fr.alpha_composite(tile, spot)
-        sheet.append(fr.convert("RGB"))
-
-    # 色を減らさない：全ての刻みの色をそのまま並べたパレットに，1ドットずつ引き当てる
-    # （quantize は近い色を取り違える）．
-    colors = sorted({c for fr in sheet for _, c in fr.getcolors(1 << 16)})
-    assert len(colors) <= 256, len(colors)
-    index = {c: i for i, c in enumerate(colors)}
-    palette = [v for c in colors for v in c]
-    frames = []
-    for fr in sheet:
-        dots = bytes(index[c] for c in fr.getdata())
-        im = Image.frombytes("P", size, dots)
-        im.putpalette(palette)
-        frames.append(im)
-    frames[0].save(out, save_all=True, append_images=frames[1:],
-                   duration=draw.TICK, loop=0)
-    print("preview:", out)
+    tiles = [draw.frames(make, leaf)
+             for leaf in (False, True) for make in draw.ROLES.values()]
+    tiles += [draw.frames(draw.research, False, level)
+              for level in draw.LEVELS]
+    tiles += [draw.frames(draw.rest, leaf) for leaf in (False, True)]
+    sheet(out, tiles, scale=4, cols=6, pad=3, margin=3, bg=(0, 0, 0, 255))
 
 
 if __name__ == "__main__":
     sprites()
     icon()
+    readme_preview()
     if len(sys.argv) > 1:
-        preview(Path(sys.argv[1]))
+        check_preview(Path(sys.argv[1]))
