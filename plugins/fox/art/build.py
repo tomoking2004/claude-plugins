@@ -222,6 +222,7 @@ def sprites() -> None:
 def icon() -> None:
     """アイコンを書き出す：目を開いた本体のベースキャラを，8倍（512ドット）にした PNG．"""
     opened = draw.MAIN_BASE[16]                 # 刻み16：目を開いている
+    ICON.parent.mkdir(exist_ok=True)
     opened.resize((512, 512), Image.NEAREST).save(ICON)
     print("icon:", ICON.name)
 
