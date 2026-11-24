@@ -2,8 +2,10 @@
 
 ベースキャラ（fox_main.gif＝本体，fox_sub.gif＝分身）の待機アニメーションに，
 役割の小道具・前足・目・眠気を重ねる．時間の刻みは100ms，1周48刻み（4.8秒）で，
-ベースキャラと同じ長さ．書き出しは build.py が担う．
+ベースキャラと同じ長さ．書き出しは theater の tools/build.py が担い，この
+モジュールの sprites()・VARIANTS・ICON を読む．
 """
+import colorsys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -499,3 +501,41 @@ LEVELS = range(4)   # 本体の眠気の段階
 def frames(make: Make, leaf: bool, level: int = 0) -> list[Image.Image]:
     """一つの役割の48刻みの絵（64×64，RGBA）．"""
     return [make(t, leaf, Sleep(t, level)) for t in range(N)]
+
+
+# ── 書き出すもの ────────────────────────────────────
+
+ICON = MAIN_BASE[16]    # アイコンにする絵：目を開いた本体のベースキャラ（刻み16）
+
+COVER = [BOOK_PAL[k] for k in "CcSo"]             # 個体ごとに変える色：本の表紙
+COVER_HUES = [0, 0.58, 0.33, 0.12, 0.75, 0.47]   # 表紙の色相の回し方（1周を1とする）
+
+
+def turn(color: Color, hue: float) -> tuple[int, ...]:
+    """色相だけを回す．"""
+    h, light, sat = colorsys.rgb_to_hls(*(v / 255 for v in color[:3]))
+    rgb = colorsys.hls_to_rgb((h + hue) % 1, light, sat)
+    return tuple(round(v * 255) for v in rgb)
+
+
+# 個体ごとに置き換える色の組．先頭の組が元の色で，残りは色相だけを回したもの．
+VARIANTS = [[turn(c, hue) for c in COVER] for hue in COVER_HUES]
+
+
+def sprites() -> dict[str, list[Image.Image]]:
+    """書き出す絵：絵の名前 → 48刻みの絵．本体は眠気の段階ごと，「眠る」は段階なし．"""
+    out = {}
+    for role, make in ROLES.items():
+        for level in LEVELS:
+            out["main-%s-%d" % (role, level)] = frames(make, False, level)
+        out["sub-%s" % role] = frames(make, True)
+    out["main-rest"] = frames(rest, False)
+    out["sub-rest"] = frames(rest, True)
+
+    # 表紙の色を，本以外の絵が使っていないことを確かめる（パネルは，絵の中の表紙の色を
+    # どの絵でも置き換える）．
+    for key, pictures in out.items():
+        used = any(color in COVER for im in pictures
+                   for _, color in im.getcolors(1 << 12))
+        assert "research" in key or not used, key
+    return out

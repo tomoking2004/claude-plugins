@@ -12,6 +12,7 @@
     { "name": "assignment", "source": "./plugins/assignment" },
     { "name": "ops", "source": "./plugins/ops" },
     { "name": "forge", "source": "./plugins/forge" },
+    { "name": "theater", "source": "./plugins/theater" },
     { "name": "fox", "source": "./plugins/fox" },
     { "name": "baton", "source": "./plugins/baton" },
     { "name": "heal", "source": "./plugins/heal" }

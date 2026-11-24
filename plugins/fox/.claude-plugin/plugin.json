@@ -8,5 +8,5 @@
   "repository": "https://github.com/tomoking2004/claude-plugins",
   "license": "MIT",
   "keywords": ["claude-code", "mod", "pane", "pixel-art", "companion"],
-  "types": "./types/index.d.ts"
+  "dependencies": ["theater@tomoking2004"]
 }
