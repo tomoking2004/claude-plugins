@@ -626,6 +626,58 @@ def check_distribution() -> int:
     return len(documents)
 
 
+# 公開しない語の控え——所有者の私的な固有名（勤め先・取引先・人名など）を1行に
+# 1語で持つ（`#` で始まる行は注釈）．控えを公開すればそれが漏れになるので，
+# 追跡しない場所に置く．
+PRIVATE_TERMS = REPO / ".local" / "private-terms.txt"
+
+
+def check_private() -> int:
+    """公開しない語が，リポジトリに入るファイルとコミットメッセージに無いか．
+
+    例文やモデルへの依頼文には，書いた場の話題がそのまま写りやすい．対象は Markdown に
+    限らず，追跡済みと，これから追跡されうる（無視されていない）全ファイルである．
+    対象のファイルの数を返す．控えの無い環境（CI など）では走査できないので，そう告げる．
+    """
+    listed = subprocess.run(
+        ["git", "ls-files", "-z", "--cached", "--others",
+         "--exclude-standard"],
+        cwd=REPO, capture_output=True,
+    )
+    if listed.returncode != 0:
+        fail(SELF, "公開しない語を検査するファイルの一覧が取れない")
+        return 0
+    names = [n for n in listed.stdout.decode("utf-8").split("\0") if n]
+    files = [REPO / n for n in names if (REPO / n).is_file()]
+    if not PRIVATE_TERMS.is_file():
+        print(f"scan: 公開しない語の控え（{rel(PRIVATE_TERMS)}）が無い——検査していない")
+        return len(files)
+    lines = PRIVATE_TERMS.read_text(encoding="utf-8").splitlines()
+    words = (line.strip() for line in lines)
+    terms = [w.casefold() for w in words if w and not w.startswith("#")]
+    if not terms:
+        fail(SELF, f"{rel(PRIVATE_TERMS)} に語が1つも無い")
+
+    # 語そのものは報告に出さない（報告は CI の記録や会話に残る）．控えの何番目かで指す．
+    for path in files:
+        text = path.read_bytes().decode("utf-8", errors="ignore").casefold()
+        for number, term in enumerate(terms, 1):
+            if term in text:
+                fail(rel(path), f"公開しない語がある（控えの{number}番目の語）")
+    log = subprocess.run(
+        ["git", "log", "--all", "--format=%h%x00%B%x1e"],
+        cwd=REPO, capture_output=True, text=True, encoding="utf-8",
+    )
+    if log.returncode != 0:
+        fail(SELF, "公開しない語を検査するコミットメッセージが取れない")
+    for entry in log.stdout.split("\x1e"):
+        short, _, message = entry.strip("\n").partition("\x00")
+        for number, term in enumerate(terms, 1):
+            if term in message.casefold():
+                fail(f"commit {short}", f"公開しない語がある（控えの{number}番目の語）")
+    return len(files)
+
+
 def check_environment() -> int:
     """ENV_EXEMPT 以外の配布文書に実行環境の語が無いか．
 
@@ -814,6 +866,7 @@ def main() -> int:
         "強調": check_emphasis(),
         "文末": check_endings(),
         "配布文書": check_distribution(),
+        "公開しない語": check_private(),
         "環境語の文書": check_environment(),
         "動的コンテキスト": check_dynamic_context(plugins),
         "コミット": check_commits(),
