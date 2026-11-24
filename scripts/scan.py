@@ -8,6 +8,7 @@ BEAUTY.md の「ゼロ確認」を印象でなく再実行可能な検査とし�
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -680,6 +681,14 @@ def fixtures() -> dict[str, str]:
     }
 
 
+# git にリポジトリの在処を教える環境変数．残したまま試験用の git 状態を作ると，`git init`・
+# `git commit` が試験用の場所でなく，その変数が指すリポジトリに当たる．
+GIT_LOCATORS = {
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_COMMON_DIR", "GIT_DIR",
+    "GIT_INDEX_FILE", "GIT_NAMESPACE", "GIT_OBJECT_DIRECTORY", "GIT_WORK_TREE",
+}
+
+
 def check_dynamic_context(plugins: set[str]) -> int:
     """SKILL.md の各 !`...` が exit 0 かつ非空の出力を返すか．
 
@@ -704,12 +713,15 @@ def check_dynamic_context(plugins: set[str]) -> int:
         fail(SELF, "動的コンテキストを検査する sh が無い（Windows では Git Bash）")
         return len(commands)
 
+    env = {
+        k: v for k, v in os.environ.items() if k.upper() not in GIT_LOCATORS
+    }
     with tempfile.TemporaryDirectory() as tmp:
         for state, setup in fixtures().items():
             cwd = Path(tmp) / state
             cwd.mkdir()
             prep = subprocess.run(
-                [sh, "-c", setup], cwd=cwd, capture_output=True
+                [sh, "-c", setup], cwd=cwd, env=env, capture_output=True
             )
             if prep.returncode != 0:
                 # 黙って受け流せば，全コマンドを誤った git 状態に対して
@@ -718,7 +730,7 @@ def check_dynamic_context(plugins: set[str]) -> int:
                 continue
             for where, cmd in commands:
                 r = subprocess.run(
-                    [sh, "-c", cmd], cwd=cwd, capture_output=True
+                    [sh, "-c", cmd], cwd=cwd, env=env, capture_output=True
                 )
                 if r.returncode != 0:
                     fail(where, f"[{state}] exit {r.returncode}：{cmd}")
