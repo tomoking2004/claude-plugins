@@ -1,6 +1,6 @@
 {
   "name": "theater",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Claude とその分身（サブエージェント）が働く様子を，キャラクターのドット絵でパネルに映す仕組み．絵はキャラクターのプラグインが持ち寄る．",
   "author": {
     "name": "tomoking2004"
