@@ -1,6 +1,6 @@
 {
   "name": "baton",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "会話が長くなったら，返答の区切りで新しいセッションへ移ることを勧め，そのまま貼れる引き継ぎ文を渡す．",
   "author": {
     "name": "tomoking2004"
