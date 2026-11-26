@@ -4,7 +4,11 @@ import { expect, mock, test } from 'claude-code/testing'
 
 const ROOT = '/work/project'
 const KEY = `handoff:${ROOT}`
-const HANDOFF = '## 目的\nテストの修理'
+const HANDOFF = 'docs/plan.md を読み，続きから進める．'
+const ADVICE = '手順の決まった作業なので，軽いモデルと低いエフォートで足りる．'
+const MOVE = `移る：${ADVICE}\n${HANDOFF}`
+const STAY = '続ける：残りは誤字の直し1件で，この会話のまま済ませるほうが安い．'
+const FRESH = '始める：頼まれた直しは済んで確かめ終えており，次へ運ぶものが無い．'
 
 const ENGINE = 'engine'
 const BAND = {
@@ -38,15 +42,16 @@ const close = async ($: Engine): Promise<void> => {
   await ui.unmount()
 }
 
-/** エンジンの代わり：コンテキストの量・会話の記録・分岐の答え・クリップボード・入力欄・トースト・帯に答える． */
+/** エンジンの代わり：コンテキストの量・会話の記録・分岐の答え・クリップボード・入力欄・帯に答える． */
 const world = (on: On) => {
   const seen = {
     tokens: 10_000 as number | undefined,
     session: 'old',
     messages: [] as SessionMessage[],
-    fork: { isAnswered: true } as { isAnswered: boolean },
+    fork: { isAnswered: true, text: MOVE },
     forked: [] as string[],
-    toasts: [] as string[],
+    // 分岐が答える前に，検査が挟む仕事．
+    during: undefined as (() => Promise<void>) | undefined,
     copied: [] as string[],
     filled: [] as string[],
     draft: '',
@@ -74,19 +79,15 @@ const world = (on: On) => {
     value: { startedAt: 0, context: { window: 1_000_000, tokens: seen.tokens }, rateLimits: [] },
   }))
   on('session.messages', () => ({ value: seen.messages }))
-  on('model.fork', (_, e) => {
+  on('model.fork', async (_, e) => {
     seen.forked.push(e.prompt)
+    await seen.during?.()
 
     return {
       value: seen.fork.isAnswered
-        ? { isAnswered: true, text: HANDOFF, usage: {} as ModelUsage }
+        ? { isAnswered: true, text: seen.fork.text, usage: {} as ModelUsage }
         : { isAnswered: false, reason: 'nothing-to-fork' },
     }
-  })
-  on('ui.toast', (_, e) => {
-    seen.toasts.push(e.text)
-
-    return { value: undefined }
   })
   on('ui.copy', (_, e) => {
     seen.copied.push(e.text)
@@ -181,14 +182,17 @@ test('残す記録は新しいものから20セッションまでにする', asy
   expect('s19' in kept).toBe(true)
 })
 
-test('/baton を走らせると帯を下ろす', async ($, on) => {
+test('/baton を走らせると勧めの帯を下ろし，答えが出るまでの間だけ，走っていることを帯に出す', async ($, on) => {
   const seen = world(on)
   seen.tokens = 160_000
   await $.session.start({ cwd: ROOT, surface: 'vscode', isInteractive: true })
 
   await $.classic.Stop(STOP)
   expect(await bandOf($)).toContain('/baton')
+  const shown: (string | undefined)[] = []
+  seen.during = async () => void shown.push(await bandOf($))
   await $.command.run(BATON)
+  expect(shown).toEqual(['/baton が会話を読んでいる．'])
   expect(await bandOf($)).toBeUndefined()
 })
 
@@ -245,10 +249,94 @@ test('/baton が引き継ぎ文を書き，写して残し，書き換えたフ�
   expect(seen.forked.length).toBe(1)
   expect(seen.forked[0]).toContain('- /work/project/c.md\n- /work/project/a.ts')
   expect(seen.forked[0]).not.toContain('b.ts')
-  expect(seen.copied[0]).toContain(HANDOFF)
-  expect(seen.copied[0]?.startsWith('前のセッションからの引き継ぎ')).toBe(true)
+  // 勧めは人に見せるだけで，引き継ぎ文には入れない．
+  expect(seen.copied).toEqual([HANDOFF])
+  expect(out.text).toContain(`次のセッションへの勧め：${ADVICE}`)
+  expect(out.text).toContain('/model')
+  expect(out.text).toContain('以後のセッションの既定')
   expect(out.text).toContain('クリップボードに写した')
-  expect((seen.store.get(KEY) as { from: string }).from).toBe('old')
+  expect(seen.store.get(KEY)).toEqual({ text: HANDOFF, from: 'old', at: 100_000 })
+})
+
+test('残りがわずかなら続けることを勧めて書かず，もう一度求められたら書く', async ($, on) => {
+  const seen = world(on)
+  seen.fork.text = STAY
+  await $.session.start({ cwd: ROOT, surface: 'vscode', isInteractive: true })
+
+  const out = await $.command.run(BATON)
+  expect(seen.forked[0]).toContain('続ける：')
+  expect(out.text).toContain(STAY)
+  expect(out.text).toContain('もう一度 /baton')
+  expect(seen.copied).toEqual([])
+  expect(seen.store.has(KEY)).toBe(false)
+
+  // 2回目は見立てを求めず，続けると答えても引き継ぎ文として扱う．3回目はまた見立てる．
+  await $.command.run(BATON)
+  expect(seen.forked[1]).not.toContain('続ける：')
+  expect(seen.copied).toEqual([STAY])
+  await $.command.run(BATON)
+  expect(seen.forked[2]).toContain('続ける：')
+})
+
+test('続けることを勧めたあとで人が別の文を送ったら，次はまた見立てる', async ($, on) => {
+  const seen = world(on)
+  seen.fork.text = STAY
+  await $.session.start({ cwd: ROOT, surface: 'vscode', isInteractive: true })
+
+  // 知らせとスラッシュコマンドの入力では，もう一度求めたことを消さない．
+  await $.command.run(BATON)
+  await $.prompt.submit({ text: '終わった', wait: false, isMeta: true, origin: { kind: 'task-notification' } })
+  await $.prompt.submit({
+    text: '/baton',
+    wait: false,
+    command: { name: 'baton', args: '' },
+    origin: { kind: 'composer' },
+  })
+  await $.command.run(BATON)
+  expect(seen.forked[1]).not.toContain('続ける：')
+
+  await $.command.run(BATON)
+  await $.prompt.submit({ text: '誤字を直して', wait: false, origin: { kind: 'composer' } })
+  await $.command.run(BATON)
+  expect(seen.forked[3]).toContain('続ける：')
+  expect(seen.copied).toEqual([STAY])
+})
+
+test('運ぶものが無ければ何も渡さずに始めることを勧めて書かず，もう一度求められたら書く', async ($, on) => {
+  const seen = world(on)
+  seen.fork.text = FRESH
+  await $.session.start({ cwd: ROOT, surface: 'vscode', isInteractive: true })
+
+  const out = await $.command.run(BATON)
+  expect(seen.forked[0]).toContain('始める：')
+  expect(out.text).toContain(FRESH)
+  expect(out.text).toContain('何も渡さずに始めればよい')
+  expect(seen.copied).toEqual([])
+  expect(seen.store.has(KEY)).toBe(false)
+
+  await $.command.run(BATON)
+  expect(seen.forked[1]).not.toContain('始める：')
+  expect(seen.copied).toEqual([FRESH])
+})
+
+test('分岐への依頼は，原文の引用を短さより優先させ，確かめていないことが無ければ無いと書かせ，エフォートに既定のままを許す', async ($, on) => {
+  const seen = world(on)
+  await $.session.start({ cwd: ROOT, surface: 'vscode', isInteractive: true })
+
+  await $.command.run(BATON)
+  expect(seen.forked[0]).toContain('短さより原文を優先する')
+  expect(seen.forked[0]).toContain('確かめていないことが無ければ，無いと書く')
+  expect(seen.forked[0]).toContain('「既定のまま」')
+})
+
+test('見立ての行が無い答えは，全体を引き継ぎ文とする', async ($, on) => {
+  const seen = world(on)
+  seen.fork.text = HANDOFF
+  await $.session.start({ cwd: ROOT, surface: 'vscode', isInteractive: true })
+
+  const out = await $.command.run(BATON)
+  expect(seen.copied).toEqual([HANDOFF])
+  expect(out.text).not.toContain('次のセッションへの勧め')
 })
 
 test('書けなければ理由を言い，前の引き継ぎ文を残す', async ($, on) => {

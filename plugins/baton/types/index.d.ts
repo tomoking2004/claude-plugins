@@ -1,4 +1,4 @@
-/** 移ることを勧めるきっかけ．`tokens` はコンテキストが量に達したこと，`compacted` は会話が自動で要約されたこと． */
+/** 移ることを勧めるきっかけ．`tokens` はコンテキストが勧め始める量に達したこと，`compacted` は会話が自動で要約されたこと． */
 export type Cue = 'tokens' | 'compacted'
 
 /** このセッションで勧めた跡． */
@@ -38,6 +38,6 @@ export type Handoff = {
 
 declare module 'claude-code' {
   interface PluginState {
-    baton: { offers: Shaped<Offers>; band: Band | null }
+    baton: { offers: Shaped<Offers>; band: Band | null; isRunning: boolean }
   }
 }
