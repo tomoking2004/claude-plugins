@@ -15,6 +15,7 @@
     { "name": "theater", "source": "./plugins/theater" },
     { "name": "fox", "source": "./plugins/fox" },
     { "name": "baton", "source": "./plugins/baton" },
+    { "name": "crew", "source": "./plugins/crew" },
     { "name": "heal", "source": "./plugins/heal" }
   ]
 }

@@ -1,0 +1,3 @@
+#!/bin/sh
+# プラグインの最上位に bin/ があると，Claude はそのプラグインを追加できない．crew は Claude Code のエージェントへ仕事を分けるのが役目で，知らせも Claude Code の mod が届けるので，このファイルで Claude Code 専用にする．
+echo "crew は Claude Code 専用である．"

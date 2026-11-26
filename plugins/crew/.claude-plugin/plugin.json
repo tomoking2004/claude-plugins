@@ -1,0 +1,12 @@
+{
+  "name": "crew",
+  "version": "0.1.0",
+  "description": "大きな仕事を独りで抱え込まないよう，エージェントへ任せる部分と自分に残す部分を見分け，分担を適切な時にだけ促す．",
+  "author": {
+    "name": "tomoking2004"
+  },
+  "repository": "https://github.com/tomoking2004/claude-plugins",
+  "license": "MIT",
+  "keywords": ["claude-code", "skills", "mod", "delegation", "agents"],
+  "dependencies": ["heal@tomoking2004"]
+}
