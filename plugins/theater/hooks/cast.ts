@@ -170,14 +170,42 @@ export const shown = (cast: Cast, actor: Actor): Role =>
           : 'rest'
         : actor.role
 
+/** 演者の順位．本体，「呼ぶ」の分身，ほかの働く分身，眠る分身の順に先． */
+const rankOf = (cast: Cast, actor: Actor): number => {
+  if (actor.id === MAIN) return 0
+  const role = shown(cast, actor)
+
+  return role === 'call' ? 1 : role === 'rest' ? 3 : 2
+}
+
 /**
  * 並べる順．本体が先頭で，「呼ぶ」の分身をその次へ寄せる（「呼ぶ」の分身が折り返しの
  * 下の段に隠れると，待たせていることを見落とすため）．ほかの分身は加わった順．
  */
 export const lined = (cast: Cast): Actor[] => {
-  const rank = (actor: Actor) => (actor.id === MAIN ? 0 : shown(cast, actor) === 'call' ? 1 : 2)
+  const at = (actor: Actor) => Math.min(rankOf(cast, actor), 2)
 
-  return [0, 1, 2].flatMap(at => cast.actors.filter(actor => rank(actor) === at))
+  return [0, 1, 2].flatMap(rank => cast.actors.filter(actor => at(actor) === rank))
+}
+
+/** 画面が描ける絵の量か動かせる絵の数が足りないときに，絵を先に取る順．順位の先から，同じ順位では加わった順． */
+export const ranked = (cast: Cast): Actor[] =>
+  [0, 1, 2, 3].flatMap(rank => cast.actors.filter(actor => rankOf(cast, actor) === rank))
+
+/**
+ * 絵の大きさの合計を `room` に収めるよう，パネルに出す演者を選ぶ．`sizes` は，絵を先に取る順に並べた
+ * 演者ごとの絵の大きさで，絵の無い演者は undefined．返すのは，演者ごとの，出すかどうか．
+ * 先の演者から順に，残りに入る絵を出す．入らない絵を，小さい絵では代えない．
+ */
+export const fitted = (sizes: (number | undefined)[], room: number): boolean[] => {
+  let left = room
+
+  return sizes.map(size => {
+    if (size === undefined || size > left) return false
+    left -= size
+
+    return true
+  })
 }
 
 const widthOf = (ch: string): number => (ch.charCodeAt(0) > 0xff ? 2 : 1)

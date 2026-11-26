@@ -33,7 +33,8 @@ Point = tuple[int, int]
 Frames = list[Image.Image]                    # 1枚の絵の，刻みごとの絵
 Cells = dict[Point, Color]                    # 1刻みの絵：(x, y) → 色
 Ticks = tuple[int, ...]                       # ドットを見せる刻み
-Dot = tuple[Ticks, Point, Color]
+Mark = tuple[Point, Color]                    # 1つのドット：位置と色
+Layers = dict[Ticks, set[Mark]]               # 見せる刻み → その間だけ見せるドット
 
 SIDE = 64               # キャンバスの一辺（ドット）
 TICK = 100              # 1刻みの長さ（ms）
@@ -102,10 +103,11 @@ def percent(tick: int, n: int) -> str:
     return ("%.4f" % (tick * 100 / n)).rstrip("0").rstrip(".") + "%"
 
 
-FROZEN = 0   # アニメーションを外して描かれるとき（動きを減らす設定）に見せる刻み
-# 分け方の目安：(1ドット, 1つの状態) が費やす文字数
-COSTS = [(6, 60), (6, 120), (4, 60), (6, 200)]
+FROZEN = 0   # アニメーションを外して描かれるときに見せる刻み
 LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"   # 色のクラス名
+PATH = '<path class="%s" d="%s"/>'
+LAYER = '<g class="layer%s" style="animation-name:k%d">%s</g>'
+KEYFRAMES = "@keyframes k%d{%s}"
 
 
 def cells(im: Image.Image) -> Cells:
@@ -120,48 +122,45 @@ def cells(im: Image.Image) -> Cells:
     return out
 
 
-def blocks(
-    pictures: list[Cells], cost: tuple[int, int],
-    x0: int = 0, y0: int = 0, size: int = SIDE,
-) -> tuple[list[Dot], int]:
-    """区画のドットを (見せる刻み, (x, y), 色) に分け，その費用の目安と並べて返す．
+def layers(pictures: list[Cells]) -> Layers:
+    """ドットを，見せる刻みが同じものどうしの層に分ける．
 
-    区画が1周の間に取る状態（絵柄）ごとに，その状態の刻みの間だけ見せる．全刻みで
-    変わらないドットは常に見せる．区画を4つに割ったほうが安ければ割る——動く部分だけが
-    細かく割れ，動かない部分は大きな区画のまま1度だけ描かれる．
+    1周の間ずっと不透明な位置は，最も長く見せる色を全ての刻みで見せて下地にし，
+    ほかの色は，その色の刻みの間だけ上に重ねる（下地は隠さずに済む）．透明になる
+    刻みがある位置は，どの色も，その色の刻みの間だけ見せる．
     """
     always = tuple(range(len(pictures)))
-    keys = [(x, y) for y in range(y0, y0 + size) for x in range(x0, x0 + size)]
-    states = {}
-    for t, cell in enumerate(pictures):
-        states.setdefault(tuple(cell.get(k) for k in keys), []).append(t)
-    still = [len({state[i] for state in states}) == 1
-             for i in range(len(keys))]
-    whole = [(always if still[i] else tuple(shown), k, state[i])
-             for n, (state, shown) in enumerate(states.items())
-             for i, k in enumerate(keys)
-             if state[i] and (n == 0 or not still[i])]
-    total = cost[0] * len(whole) + cost[1] * (len(states) > 1) * len(states)
-    if len(states) == 1 or size == 1:
-        return whole, total
-
-    half = size // 2
-    parts = [blocks(pictures, cost, x, y, half)
-             for y in (y0, y0 + half) for x in (x0, x0 + half)]
-    split = sum(c for _, c in parts)
-    if split < total:
-        return [dot for dots, _ in parts for dot in dots], split
-    return whole, total
+    out = {}
+    for y in range(SIDE):
+        for x in range(SIDE):
+            line = [cell.get((x, y)) for cell in pictures]
+            shown = {}
+            for t, color in enumerate(line):
+                if color:
+                    shown.setdefault(color, []).append(t)
+            if None not in line:
+                under = max(shown, key=lambda color: (len(shown[color]), color))
+                shown[under] = always
+            for color, at in shown.items():
+                out.setdefault(tuple(at), set()).add(((x, y), color))
+    return out
 
 
-def paths(pixels: Cells, classes: dict[Color, str]) -> str:
-    """{(x, y): 色} を，色ごとの横線の集まり（<path>）にする．
+def steps(shown: Ticks, n: int) -> str:
+    """層を見せる・隠すの切り替えを，1周 n 刻みのキーフレームの中身にする．"""
+    on = set(shown)
+    return "".join("%s{opacity:%d}" % (percent(t, n), t in on)
+                   for t in range(n)
+                   if t == 0 or (t in on) != (t - 1 in on))
+
+
+def paths(marks: set[Mark], classes: dict[Color, str]) -> str:
+    """ドットの集まりを，色ごとの横線の集まり（<path>）にする．
 
     線は左上から順に，前の線の終わりからの相対位置でつなぐ（絶対位置より短い）．
     """
     runs = {}
-    rows = sorted(pixels.items(), key=lambda item: (item[0][1], item[0][0]))
-    for (x, y), color in rows:
+    for (x, y), color in sorted(marks, key=lambda mark: (mark[0][1], mark[0][0])):
         row = runs.setdefault(color, [])
         if row and row[-1][1] == y and row[-1][0] + row[-1][2] == x:
             row[-1][2] += 1
@@ -173,41 +172,91 @@ def paths(pixels: Cells, classes: dict[Color, str]) -> str:
         for x, y, w in row:
             d.append("m%d %dh%d" % (x - pen[0], y - pen[1], w))
             pen = (x + w, y)
-        out.append('<path class="%s" d="%s"/>' % (classes[color], "".join(d)))
+        out.append(PATH % (classes[color], "".join(d)))
     return "".join(out)
 
 
-def encode(dots: list[Dot], n: int) -> str:
-    """(見せる刻み, (x, y), 色) の集まりを，1周 n 刻みの SVG の文字列にする．
+def layer(shown: Ticks, marks: set[Mark], classes: dict[Color, str],
+          n: int, i: int) -> tuple[str, str]:
+    """1つの層を，1周 n 刻みの SVG の記述（キーフレームと，ドットのまとまり）にする．
 
-    見せる刻みが同じドットを1つの層にまとめ，層ごとに，見せる・隠すの切り替えを
-    CSS のアニメーションで持つ．アニメーションを外すと刻み FROZEN の絵になるよう，
-    その刻みに見せない層だけを，素の状態で隠しておく（off）．
+    アニメーションを外すと刻み FROZEN の絵になるよう，その刻みに見せない層は，
+    素の状態で隠しておく（off）．
+    """
+    off = "" if FROZEN in shown else " off"
+    return (KEYFRAMES % (i, steps(shown, n)),
+            LAYER % (off, i, paths(marks, classes)))
+
+
+def merged(found: Layers, n: int) -> Layers:
+    """層を，ほかの層へ配って減らす．
+
+    ある層の刻みを，それに含まれる刻みだけを見せるほかの層を幾つか合わせて，ちょうど
+    覆えることがある．そのとき，層のドットをそれらの層へ配っても同じ絵になる（同じドットを
+    2つの層が同時に見せてもよい）．配った先で増える文字数が，その層の記述の文字数より少なければ配る．
+    記述の短い層から順に試し，配れる層が無くなるまで繰り返す．全ての刻みで見せる層は
+    下地なので，配らない．
     """
     always = tuple(range(n))
-    layers = {}
-    for shown, key, color in dots:
-        layers.setdefault(shown, {})[key] = color
-    colors = sorted({color for _, _, color in dots})
+    out = {shown: set(marks) for shown, marks in found.items()}
+    sets = {shown: frozenset(shown) for shown in out}
+    classes = {color: LETTERS[0] for marks in out.values() for _, color in marks}
+
+    def length(shown: Ticks, marks: set[Mark]) -> int:
+        return sum(map(len, layer(shown, marks, classes, n, 0)))
+
+    def cover(shown: Ticks) -> list[Ticks] | None:
+        """shown をちょうど覆う，ほかの層の組（残りを最も多く覆う層から取る）．"""
+        inside = [other for other in sorted(out)
+                  if other != shown and sets[other] <= sets[shown]]
+        left, chosen = set(shown), []
+        while left:
+            best = max(inside, key=lambda other: len(sets[other] & left),
+                       default=None)
+            if best is None or not sets[best] & left:
+                return None
+            chosen.append(best)
+            left -= sets[best]
+        return chosen
+
+    size = {shown: length(shown, marks) for shown, marks in out.items()}
+    moved = True
+    while moved:
+        moved = False
+        for shown in sorted(out, key=lambda shown: (size[shown], shown)):
+            onto = None if shown == always else cover(shown)
+            if onto is None:
+                continue
+            grown = {other: length(other, out[other] | out[shown])
+                     for other in onto}
+            if sum(grown[other] - size[other] for other in onto) < size[shown]:
+                for other in onto:
+                    out[other] |= out[shown]
+                    size[other] = grown[other]
+                del out[shown]
+                moved = True
+    return out
+
+
+def encode(found: Layers, n: int) -> str:
+    """層を，1周 n 刻みの SVG の文字列にする．
+
+    層ごとに，見せる・隠すの切り替えを CSS のアニメーションで持つ．全ての刻みで
+    見せる層（下地）を先に描き，ほかの層をその上に描く．
+    """
+    always = tuple(range(n))
+    colors = sorted({color for marks in found.values() for _, color in marks})
     assert len(colors) <= len(LETTERS), \
         "1枚の絵の色が%d色を超えた：%d色" % (len(LETTERS), len(colors))
     classes = dict(zip(colors, LETTERS))
 
     css = [".%s{stroke:%s}" % (classes[color], hexa(color))
            for color in colors]
-    groups = []
-    for i, (shown, pixels) in enumerate(sorted(layers.items())):
-        if shown == always:
-            groups.append(paths(pixels, classes))
-            continue
-        on = set(shown)
-        steps = ["%s{opacity:%d}" % (percent(t, n), t in on)
-                 for t in range(n)
-                 if t == 0 or (t in on) != (t - 1 in on)]
-        css.append("@keyframes k%d{%s}" % (i, "".join(steps)))
-        off = "" if FROZEN in on else " off"
-        groups.append('<g class="layer%s" style="animation-name:k%d">%s</g>'
-                      % (off, i, paths(pixels, classes)))
+    groups = [paths(found.get(always, set()), classes)]
+    for i, shown in enumerate(sorted(set(found) - {always})):
+        keyframes, group = layer(shown, found[shown], classes, n, i)
+        css.append(keyframes)
+        groups.append(group)
 
     return (
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d"'
@@ -222,13 +271,9 @@ def encode(dots: list[Dot], n: int) -> str:
 
 
 def svg(frames: Frames) -> str:
-    """刻みごとの絵を，1枚のアニメーション SVG にする．
-
-    分け方の目安を幾つか試し，最も短いものを採る．
-    """
-    pictures = [cells(im) for im in frames]
-    tries = (encode(blocks(pictures, cost)[0], len(frames)) for cost in COSTS)
-    out = min(tries, key=len)
+    """刻みごとの絵を，1枚のアニメーション SVG にする．"""
+    n = len(frames)
+    out = encode(merged(layers([cells(im) for im in frames]), n), n)
     assert len(out) <= LIMIT, "SVG が上限を超えた：%d 文字" % len(out)
     return out
 

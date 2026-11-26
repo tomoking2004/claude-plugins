@@ -28,6 +28,18 @@ const SIZE = { dock: 256, inline: 192 }
 // 頼みであって，ユーザーが自分で変えた高さがあればそちらが勝つ．
 const ROWS = 18
 const TICK_MS = 100 // アニメーションの1刻みの長さ
+// VS Code のパネルに当てる2つの上限．ほかの画面には当てず，全ての演者をその絵のまま動かす．
+// パネル1枚に並べる絵（SVG の文字列）の大きさの合計の上限．VS Code は，パネルの文字を合わせて
+// 262,144字までしか描かず，超えた演者から後ろを描かない．一言などの分を残して，その手前に収める．
+const ROOM = 250_000
+/** 絵が入らず省いた演者がいるときに，パネルの下に書く断り． */
+const OMITTED = (count: number) =>
+  `ほか${count}体は，この画面が一度に描ける量を超えるので，省いている．`
+// 動かして描く絵の数の上限．VS Code が1つのプラグインの絵を同時に動かすのは6枚までで，
+// 先に動き始めた絵が枠を持ち続ける．
+const MOVING = 6
+// 絵を動かす CSS の宣言（`tools/build.py` が書く形）．除くと，絵は刻み0の姿で止まる．
+const ANIMATION = /animation-[a-z-]+:[^;}"]*;?/g
 const UNIT_PX = 7 // 絵の下の一言で，半角1字が取る幅の目安
 const TERMINAL_WIDTH = 80 // 端末で，一言を切る幅
 const ROLE_NAME: Record<Role, string> = {
@@ -105,20 +117,8 @@ const load = async ($: EngineInterface, character: Character, name: string): Pro
   return text
 }
 
-/**
- * 1体ぶんの SVG．候補（`cast.spritesOf`）のうち，キャラクターが持つ最初の絵を使う．
- * 分身は個体ごとに，動きの位相と色を変える．
- */
-const sprite = async (
-  $: EngineInterface,
-  character: Character,
-  keys: string[],
-  id: string,
-): Promise<string> => {
-  const index = JSON.parse(await load($, character, 'index.json')) as Index
-  const key = keys.find(name => index.sprites.includes(name))
-  if (key === undefined) return ''
-  const svg = await load($, character, `${key}.svg`)
+/** 分身の絵に，個体ごとの差を付ける：動きの位相と色を変える．本体の絵は変えない． */
+const varied = (svg: string, index: Index, id: string): string => {
   if (id === cast.MAIN) return svg
 
   const seed = [...id].reduce((sum, ch) => (sum * 31 + ch.charCodeAt(0)) >>> 0, 7)
@@ -131,6 +131,84 @@ const sprite = async (
     (out, color, i) => out.replace(color, variant[i] ?? color),
     svg.replace('animation-delay:0s', `animation-delay:-${delay}s`),
   )
+}
+
+// VS Code で，絵を止めてから，空いた枠で別の絵を動かし始めるまでに置く間．VS Code が止める頼みを
+// 裁き終えるのを待つ．
+const HANDOVER_MS = 500
+let moved = new Set<number>() // VS Code で，前の描画で動かした絵の，並びの中の位置
+let leftAt = -Infinity // 動かしていた絵を，最後に止めた時刻
+let handover: Timer | undefined
+
+/**
+ * VS Code で動かす絵の位置．`wanted` は動かしたい位置，`count` は並ぶ絵の数．
+ * VS Code は，動かす枠を絵の位置ごとに，頼まれた順（並び順）に裁き，枠が空いていないときに頼んだ絵を
+ * 1分ほど止めたままにする．そこで，動かす位置の入れ替えは2段に分ける：前に動かした位置のうち
+ * 外すものがあれば，先に外すだけにして，入る位置は `HANDOVER_MS` 後の描画で動かす．
+ */
+const movable = async (
+  $: EngineInterface,
+  wanted: Set<number>,
+  count: number,
+): Promise<Set<number>> => {
+  const now = await $.clock.now()
+  if ([...moved].some(at => at < count && !wanted.has(at))) leftAt = now
+  const isSettled = now - leftAt >= HANDOVER_MS
+  moved = new Set([...wanted].filter(at => isSettled || moved.has(at)))
+  handover?.cancel()
+  handover =
+    moved.size < wanted.size
+      ? $.clock.after(leftAt + HANDOVER_MS - now, () => void $.ui.invalidate('ui.render'))
+      : undefined
+
+  return moved
+}
+
+/**
+ * 演者ごとの SVG．演者の絵は，候補（`cast.spritesOf`）のうち，キャラクターが持つ最初のもの．
+ * 上限のある画面（`isCapped`）では，絵を先に取る順（`cast.ranked`）で先の演者から，絵の大きさの合計が
+ * `ROOM` に収まるだけ絵を出し，入らない演者は省く．その画面で動かすのは，絵を出す演者のうち，その順で先の
+ * `MOVING` 体までで，残りは止めて描く．
+ */
+const sprites = async (
+  $: EngineInterface,
+  character: Character,
+  current: Cast,
+  isCapped: boolean,
+): Promise<Map<string, string>> => {
+  const index = JSON.parse(await load($, character, 'index.json')) as Index
+  const order = cast.ranked(current)
+  const pictures = await Promise.all(
+    order.map(actor => {
+      const name = cast.spritesOf(current, actor).find(of => index.sprites.includes(of))
+
+      return name === undefined ? undefined : load($, character, `${name}.svg`)
+    }),
+  )
+  const fits = cast.fitted(
+    pictures.map(svg => svg?.length),
+    isCapped ? ROOM : Infinity,
+  )
+  const drawn = new Map<string, string>()
+  order.forEach((actor, i) => {
+    const svg = pictures[i]
+    if (svg === undefined || fits[i] !== true) return
+    drawn.set(actor.id, varied(svg, index, actor.id))
+  })
+  if (!isCapped) return drawn
+
+  // 位置は，パネルに置く絵の並びで数える．省いた演者は絵を置かないので，数えない．
+  const places = cast
+    .lined(current)
+    .map(actor => actor.id)
+    .filter(id => drawn.has(id))
+  const wanted = new Set([...drawn.keys()].slice(0, MOVING).map(id => places.indexOf(id)))
+  const moving = await movable($, wanted, places.length)
+  for (const [id, svg] of drawn) {
+    if (!moving.has(places.indexOf(id))) drawn.set(id, svg.replace(ANIMATION, ''))
+  }
+
+  return drawn
 }
 
 // ── 状態の書き換え ───────────────────────────────────
@@ -426,20 +504,33 @@ export const register: Register = on => {
     const size = e.props.placement === 'inline' ? SIZE.inline : SIZE.dock
     const sources =
       character === undefined
-        ? []
-        : await Promise.all(
-            actors.map(actor => sprite($, character, cast.spritesOf(current, actor), actor.id)),
-          )
+        ? new Map<string, string>()
+        : await sprites($, character, current, e.surface === 'vscode')
+
+    // 絵と一言は，組で出す．絵が入らない演者は，一言ごと省く．
+    const shown = actors.flatMap(actor => {
+      const source = sources.get(actor.id)
+
+      return source === undefined ? [] : [{ actor, source }]
+    })
 
     // 1段に並ぶ数は決めず，パネルの幅に入るだけ並べて折り返す．各段は中央に寄せる．
-    return (
+    const row = (
       <Box flexDirection="row" flexWrap="wrap" justifyContent="center">
-        {actors.map((actor, i) => (
+        {shown.map(({ actor, source }) => (
           <Box flexDirection="column" alignItems="center" flexShrink={0}>
-            <Svg source={sources[i] ?? ''} alt={alt(actor)} width={size} height={size} />
+            <Svg source={source} alt={alt(actor)} width={size} height={size} />
             <Text dimColor>{cast.brief(actor.label, size / UNIT_PX)}</Text>
           </Box>
         ))}
+      </Box>
+    )
+    if (shown.length === actors.length) return row
+
+    return (
+      <Box flexDirection="column" alignItems="center" gap={1}>
+        {row}
+        <Text dimColor>{OMITTED(actors.length - shown.length)}</Text>
       </Box>
     )
   })

@@ -40,8 +40,32 @@ const KIT: Plugin = {
     })
   },
 }
+// 絵が大きいキャラクター．「書く」の絵は3枚，「考える」の絵は7枚で，パネルに並べられる絵の大きさを超える．
+const BIG: Plugin = {
+  name: 'big',
+  register(on) {
+    on('session.start', async ($, e, next) => {
+      await $.theater.join({ name: 'big', title: 'ビッグ', root: '/big' })
+
+      return next(e)
+    })
+  },
+}
+// 「書く」の絵が，1枚でパネルに並べられる絵の大きさを超えるキャラクター．
+const VAST: Plugin = {
+  name: 'vast',
+  register(on) {
+    on('session.start', async ($, e, next) => {
+      await $.theater.join({ name: 'vast', title: 'ヴァスト', root: '/vast' })
+
+      return next(e)
+    })
+  },
+}
 const ONE = { plugins: [FOX] }
 const TWO = { plugins: [FOX, KIT] }
+const HEAVY = { plugins: [BIG] }
+const OVERSIZED = { plugins: [VAST] }
 const WORKING = ['think', 'research', 'write', 'run', 'watch', 'call']
 const INDEX = {
   '/fox': {
@@ -55,9 +79,15 @@ const INDEX = {
     variants: [['#964034'], ['#345b96']],
   },
   '/kit': { ticks: 8, sprites: ['main-think'], variants: [] },
+  '/big': { ticks: 8, sprites: ['main-think', 'main-write', 'sub-write', 'sub-rest'], variants: [] },
+  '/vast': { ticks: 8, sprites: ['main-think', 'sub-write'], variants: [] },
 }
+const BIG_SIZE = { think: 40_000, other: 100_000 } // BIG の絵の大きさ（文字数）．「考える」の絵だけが小さい
+const VAST_WRITE = 300_000 // VAST の「書く」の絵の大きさ（文字数）
 const SPRITE = (name: string) =>
-  `<svg xmlns="http://www.w3.org/2000/svg"><style>.a{stroke:#964034}.layer{animation-delay:0s}</style><title>${name}</title></svg>`
+  `<svg xmlns="http://www.w3.org/2000/svg"><style>.a{stroke:#964034}.layer{animation-duration:1s;animation-delay:0s}</style><title>${name}</title><g class="layer" style="animation-name:k1"/></svg>`
+/** 絵の名前（`SPRITE` が `<title>` に書いたパスの，拡張子を除く末尾）． */
+const nameOf = (source: string) => source.match(/([a-z0-9-]+)\.svg<\/title>/)?.[1]
 
 /** エンジンの代わり：プラグインが呼ぶ時計・コマンドの登録・パネル・保存した値・ファイル・コンテキストの量・エージェントの一覧・小さなモデルに答える． */
 const world = (on: On, usage = { tokens: 10_000 }) => {
@@ -106,18 +136,29 @@ const world = (on: On, usage = { tokens: 10_000 }) => {
   on('session.usage', () => ({
     value: { startedAt: 0, context: { window: 1_000_000, tokens: usage.tokens }, rateLimits: [] },
   }))
-  on('fs.read', (_, e) => ({
-    value: e.path.endsWith('index.json')
-      ? JSON.stringify(e.path.includes('kit') ? INDEX['/kit'] : INDEX['/fox'])
-      : SPRITE(e.path.replaceAll('\\', '/')),
-  }))
+  on('fs.read', (_, e) => {
+    const path = e.path.replaceAll('\\', '/')
+    const root = (['/kit', '/big', '/vast'] as const).find(at => path.includes(`${at}/`)) ?? '/fox'
+    const size =
+      root === '/big'
+        ? path.includes('think')
+          ? BIG_SIZE.think
+          : BIG_SIZE.other
+        : root === '/vast' && path.includes('write')
+          ? VAST_WRITE
+          : 0
+
+    return {
+      value: path.endsWith('index.json') ? JSON.stringify(INDEX[root]) : SPRITE(path).padEnd(size),
+    }
+  })
 
   return { clock, usage, agents, names, pane }
 }
 
-/** パネルに並ぶ演者の，読み上げ用の文（本体か分身か：役割）と絵を返す． */
-const actors = async ($: Engine) => {
-  const ui = await $.ui.mount({ ...PANE, surface: 'vscode' })
+/** パネルに並ぶ演者の，読み上げ用の文（本体か分身か：役割）と絵を返す．画面は，名指さなければ VS Code． */
+const actors = async ($: Engine, surface: 'vscode' | 'desktop' | 'mobile' = 'vscode') => {
+  const ui = await $.ui.mount({ ...PANE, surface })
   const drawn = await ui.findAll({ type: 'Svg' })
   await ui.unmount()
 
@@ -493,6 +534,104 @@ test('持っていない絵は，本体の絵・眠気なしの絵・「考え�
   expect(drawn.every(actor => actor.source.includes('kit/sprites/main-think.svg'))).toBe(true)
   // 位相は，キャラクターの刻み（8刻み）のどこかへ，個体ごとにずらす．
   expect(drawn[1]?.source).toMatch(/animation-delay:-0(\.[1-7])?s/)
+})
+
+test('並べる絵が大きすぎるときは，先の演者から入るだけ絵と一言を出し，入らない演者は省いて断る', HEAVY, async ($, on) => {
+  world(on)
+  await start($)
+  const write = (agentId?: string) =>
+    $.tool.call({ tool: 'Write', file_path: '/a', content: '', ...(agentId === undefined ? {} : { agentId }) })
+  const names = async () => (await actors($)).map(actor => nameOf(actor.source))
+  for (const id of ['a1', 'a2']) {
+    await $.classic.SubagentStart({ agent_id: id, agent_type: 'Explore' })
+    await write(id)
+  }
+  await write()
+
+  // 「書く」の絵は2枚まで入る．本体と先に加わった分身が取り，後の分身は，小さい絵で代えずに，一言ごと省く．
+  const drawn = await actors($)
+  expect(drawn.map(actor => nameOf(actor.source))).toEqual(['main-write', 'sub-write'])
+  expect(drawn.reduce((sum, actor) => sum + actor.source.length, 0)).toBeLessThan(262_144)
+  expect(await captions($)).toEqual(['', 'Explore', 'ほか1体は，この画面が一度に描ける量を超えるので，省いている．'])
+
+  // 眠る分身は，働く分身より後に絵を取る．先に加わっていても，「眠る」の絵は入らない．
+  await $.classic.SubagentStop({
+    agent_id: 'a1',
+    agent_type: 'Explore',
+    agent_transcript_path: '/t',
+    stop_hook_active: false,
+  })
+  expect(await names()).toEqual(['main-write', 'sub-write'])
+
+  // 入らない絵の後の演者でも，入る絵は出す．
+  await $.classic.SubagentStart({ agent_id: 'a3', agent_type: 'Explore' })
+  expect(await names()).toEqual(['main-write', 'sub-write', 'main-think'])
+})
+
+test('絵の大きさの合計を，上限に収める', () => {
+  expect(cast.fitted([100, 100, 100], 250)).toEqual([true, true, false])
+  // 入らない絵の後の演者でも，入る絵は出す．
+  expect(cast.fitted([100, 100, 100, 40], 250)).toEqual([true, true, false, true])
+  // 絵の無い演者は，出さない．
+  expect(cast.fitted([undefined, 10], 15)).toEqual([false, true])
+  // 上限が無ければ，どの演者にも絵を出す．
+  expect(cast.fitted([100, 100], Infinity)).toEqual([true, true])
+})
+
+test('動かす絵は6体までで，本体・働く分身・眠る分身の順に取る', ONE, async ($, on) => {
+  const { clock } = world(on)
+  await start($)
+  for (const id of ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7']) {
+    await $.classic.SubagentStart({ agent_id: id, agent_type: 'Explore' })
+  }
+  const moving = async () => (await actors($)).map(actor => actor.source.includes('animation'))
+  expect(await moving()).toEqual([true, true, true, true, true, true, false, false])
+
+  // 眠った分身は止めて，働く分身を動かす．入れ替えは2段に分け，先に止めて，間を置いてから動かす．
+  await $.classic.SubagentStop({
+    agent_id: 'a1',
+    agent_type: 'Explore',
+    agent_transcript_path: '/t',
+    stop_hook_active: false,
+  })
+  expect(await moving()).toEqual([true, false, true, true, true, true, false, false])
+  expect(await moving()).toEqual([true, false, true, true, true, true, false, false])
+  await clock.advance(500)
+  expect(await moving()).toEqual([true, false, true, true, true, true, true, false])
+})
+
+test('省いた演者は，動かす絵の位置に数えない', OVERSIZED, async ($, on) => {
+  world(on)
+  await start($)
+  for (const id of ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7']) {
+    await $.classic.SubagentStart({ agent_id: id, agent_type: 'Explore' })
+  }
+  const moving = async () => (await actors($)).map(actor => actor.source.includes('animation'))
+  expect(await moving()).toEqual([true, true, true, true, true, true, false, false])
+
+  // 書き始めた分身は絵が入らず省かれ，後ろの絵が1つずつ前へ詰まる．動かす位置は変わらないので，
+  // 間を置かずに6枚を動かす．
+  await $.tool.call({ tool: 'Write', file_path: '/a', content: '', agentId: 'a2' })
+  expect(await moving()).toEqual([true, true, true, true, true, true, false])
+})
+
+test('絵の大きさと動かす数の上限は VS Code だけに当て，ほかの画面では全員をその絵のまま動かす', HEAVY, async ($, on) => {
+  world(on)
+  await start($)
+  await $.tool.call({ tool: 'Write', file_path: '/a', content: '' })
+  for (const id of ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7']) {
+    await $.classic.SubagentStart({ agent_id: id, agent_type: 'Explore' })
+    await $.tool.call({ tool: 'Write', file_path: '/a', content: '', agentId: id })
+  }
+
+  for (const surface of ['desktop', 'mobile'] as const) {
+    const drawn = await actors($, surface)
+    expect(drawn.map(actor => nameOf(actor.source))).toEqual(['main-write', ...Array<string>(7).fill('sub-write')])
+    expect(drawn.every(actor => actor.source.includes('animation'))).toBe(true)
+  }
+
+  // VS Code では，入る2体にだけ絵を出す．
+  expect((await actors($)).map(actor => nameOf(actor.source))).toEqual(['main-write', 'sub-write'])
 })
 
 test('絵の候補は，望ましい順に並ぶ', () => {
