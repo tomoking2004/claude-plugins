@@ -1,6 +1,6 @@
 {
   "name": "forge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "既存のものを調べて比べ，取捨を決めてから新しいプラグインやスキルを作る，定義づくりのスキル群．",
   "author": {
     "name": "tomoking2004"
