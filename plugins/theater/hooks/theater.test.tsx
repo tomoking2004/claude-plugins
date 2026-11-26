@@ -83,10 +83,11 @@ const world = (on: On, usage = { tokens: 10_000 }) => {
   on('tool.call', () => ({ result: {} }))
   const agents: AgentInfo[] = []
   on('agent.list', () => ({ value: agents }))
-  // `calls` は，一言を頼まれた回数．
-  const names = { text: 'README の校正', isAnswered: true, calls: 0 }
-  on('model.complete', () => {
+  // `calls` は一言を頼まれた回数，`prompt` は最後に読まされた依頼の文．
+  const names = { text: 'README の校正', isAnswered: true, calls: 0, prompt: '' }
+  on('model.complete', (_, e) => {
     names.calls += 1
+    names.prompt = e.prompt
 
     return {
       value: names.isAnswered
@@ -314,6 +315,31 @@ test('モデルが依頼そのものに答えたら，その返事は一言に�
   await say($, 'さらにもう一度')
   await clock.settle()
   expect(await captions($)).toEqual(['設計文書と実装の照合確認'])
+})
+
+test('画面が依頼の文に足した段は，一言に使わない', ONE, async ($, on) => {
+  const { clock, names } = world(on)
+  const added = '<browser_instruction># Example\n\nYou have access to example tools.</browser_instruction>'
+  await start($)
+  await say($, `${added}\n表を足して`)
+  await clock.settle()
+  expect(names.prompt).toBe('表を足して')
+
+  // モデルが答えないときに使う依頼の文にも，足された段は入らない．貼り付けた文は，囲むタグだけを外す．
+  names.isAnswered = false
+  await say($, `${added}\n<ide_opened_file>The user opened a file.</ide_opened_file>\n図を足して`)
+  await clock.settle()
+  expect(await captions($)).toEqual(['図を足して'])
+  await say($, '\n\n<pasted_content id="a1">\n節を足して\n</pasted_content>')
+  await clock.settle()
+  expect(await captions($)).toEqual(['節を足して'])
+
+  // ユーザーが書いた部分が無ければ，一言を頼まず，前の一言を残す．
+  const calls = names.calls
+  await say($, added)
+  await clock.settle()
+  expect(names.calls).toBe(calls)
+  expect(await captions($)).toEqual(['節を足して'])
 })
 
 test('絵は演者の数によらず同じ大きさで，入力欄の上のパネルでは一段小さい', ONE, async ($, on) => {

@@ -184,6 +184,15 @@ const NAMING = [
 const SENTENCE_END = /[。．.!?！？]$/
 const PROMPT_LIMIT = 2000 // 一言を付けるのに読ませる依頼の長さ．依頼の文を一言に使うときの長さでもある
 
+// 画面が依頼の文に足す段：名前に `_` か `-` を含む，属性の無いタグで囲まれている（VS Code が足す
+// `<browser_instruction>` や `<ide_opened_file>` など）．一言には使わない．
+const INJECTED = /<([a-z]+(?:[_-][a-z]+)+)>[\s\S]*?<\/\1>/g
+// 貼り付けた文を囲むタグ．中身はユーザーの文なので，タグだけを外す．
+const PASTED = /<\/?pasted_content[^>]*>/g
+
+/** 依頼の文のうち，ユーザーが書いた部分． */
+const written = (text: string): string => text.replace(PASTED, '').replace(INJECTED, '').trim()
+
 // ユーザー自身が送った依頼の出どころ（知らせや他のセッションの伝言は含めない）．
 const FROM_USER = ['composer', 'bridge', 'sdk']
 
@@ -194,9 +203,11 @@ let namings = 0 // 一言を頼んだ回数
 
 /**
  * 本体の一言を付け替える．新しい一言が届くまでは，前の一言を出しておく．モデルが答えないか，一言を
- * 付けずに依頼そのものに答えたときは，依頼の文を使う．
+ * 付けずに依頼そのものに答えたときは，依頼の文を使う．ユーザーが書いた部分が無い依頼では，付け替えない．
  */
-const name = async ($: EngineInterface, prompt: string): Promise<void> => {
+const name = async ($: EngineInterface, text: string): Promise<void> => {
+  const prompt = written(text)
+  if (prompt === '') return
   const turn = ++namings
   const reply = await $.model
     .complete({
