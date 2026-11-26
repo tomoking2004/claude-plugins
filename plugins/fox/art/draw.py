@@ -498,9 +498,15 @@ ROLES: dict[str, Make] = {"think": think, "research": research, "write": write,
 LEVELS = range(4)   # 本体の眠気の段階
 
 
+# 書き出す絵の刻み0に充てる，描く刻み．パネルが絵を止めて描くときは刻み0の姿を見せるので，
+# どの役割でも，まばたき・あくび・船こぎに当たらない刻みを充てる（「考える」の描く刻み0は，目を閉じている）．
+START = 4
+
+
 def frames(make: Make, leaf: bool, level: int = 0) -> list[Image.Image]:
-    """一つの役割の48刻みの絵（64×64，RGBA）．"""
-    return [make(t, leaf, Sleep(t, level)) for t in range(N)]
+    """一つの役割の48刻みの絵（64×64，RGBA）．描く刻み START から始めて1周する．"""
+    return [make(t % N, leaf, Sleep(t % N, level))
+            for t in range(START, START + N)]
 
 
 # ── 書き出すもの ────────────────────────────────────
