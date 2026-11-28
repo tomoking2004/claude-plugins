@@ -314,6 +314,8 @@ const instruct = async ($: EngineInterface, input: unknown): Promise<void> => {
   if (typeof to !== 'string' || typeof summary !== 'string') return
   // 宛先は分身の id か，起動のときに付けた呼び名．
   const id = (await $.agent.list()).find(agent => agent.id === to || agent.name === to)?.id ?? to
+  // 分身が本体へ送った報告では替えない（本体の一言は，ユーザーの依頼からだけ付ける）．
+  if (id === cast.MAIN) return
   await change($, was => cast.relabeled(was, id, summary))
 }
 

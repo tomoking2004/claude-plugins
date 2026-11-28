@@ -299,6 +299,10 @@ test('絵の下の一言は，指示が届いたときだけ替わる', ONE, asy
   await $.tool.call({ tool: 'SendMessage', to: 'checker', summary: '画像リンクの確認', message: '…' })
   expect(await captions($)).toEqual(['表の追加', '画像リンクの確認'])
 
+  // 分身が本体へ送っても，本体の一言は替わらない．
+  await $.tool.call({ tool: 'SendMessage', to: 'main', summary: '調べ終えた', message: '…', agentId: 'a1' })
+  expect(await captions($)).toEqual(['表の追加', '画像リンクの確認'])
+
   // 一覧に載らない分身には，エージェントの種類を書く．
   await $.classic.SubagentStart({ agent_id: 'a2', agent_type: 'Explore' })
   expect((await captions($))[2]).toBe('Explore')
