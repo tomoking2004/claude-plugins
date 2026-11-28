@@ -16,6 +16,7 @@
     { "name": "fox", "source": "./plugins/fox" },
     { "name": "baton", "source": "./plugins/baton" },
     { "name": "crew", "source": "./plugins/crew" },
+    { "name": "ledger", "source": "./plugins/ledger" },
     { "name": "heal", "source": "./plugins/heal" }
   ]
 }

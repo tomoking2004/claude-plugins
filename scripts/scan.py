@@ -81,7 +81,8 @@ BUILTIN_COMMANDS = {
 # （README の「構成」）——名詞だけの名前は，素の名前では役目が分からない．
 SKILL_VERBS = {
     "check", "clean", "commit", "complete", "discuss", "distill",
-    "divide", "heal", "refine", "release", "run", "survey", "verify", "write",
+    "divide", "heal", "refine", "release", "run", "survey", "tidy", "update",
+    "verify", "write",
 }
 SKILL_OBJECT = re.compile(r"[a-z]+(-[a-z]+)*", re.ASCII)
 
@@ -146,6 +147,7 @@ COPIES = {
     "周回": "（走査と直しの一巡）",
     "検査役のゼロは": "検査役のゼロは，確定を差し止める指摘（止める指摘）のゼロを指す",
     "まず [BEAUTY": "まず [BEAUTY.md](../../BEAUTY.md) を読み，美の6条と走査の規律に従う．",
+    "まず [LEDGER": "まず [LEDGER.md](../../LEDGER.md) を読む．",
     "列挙で固定しない": "対応を列挙で固定しない（媒体スキルの増減に自動で追従させる）．",
     "大幅に・劇的に等": "測っていない程度の語（大幅に・劇的に等）を使わない",
     "その**進行**": (
@@ -225,7 +227,7 @@ COPIES = {
 # これより短い一致は，語句の偶然の一致と見分けがつかない．
 COPY_MIN = 30
 # 写しの件数の控え．キーの語ごと書き換えた写しは照合を逃れ，件数の減りにだけ現れる．
-COPY_TOTAL = 151
+COPY_TOTAL = 157
 
 DATE = re.compile(r"(?<!\d)20\d{2}[-/年]\d{1,2}")
 # 環境語を許す配布文書．ops は環境の操作そのものを担い，commit-changes・
@@ -248,7 +250,7 @@ ENV_WORDS = re.compile(
     r"|サブエージェント|ハーネス"
 )
 # Claude Code 専用のプラグイン．プラグインの最上位の bin/ が Claude への追加を止める．
-CLAUDE_CODE_ONLY = {"baton", "capstone", "crew", "fox", "ops", "theater"}
+CLAUDE_CODE_ONLY = {"baton", "capstone", "crew", "fox", "ledger", "ops", "theater"}
 # 最上位の README が名指してよいプラグイン．refine は美の基準を，heal は定義の
 # 治療を，プラグインをまたいで担う．紹介は，どのプラグインも自分の README が持つ．
 SHARED = {"heal", "refine"}

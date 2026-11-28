@@ -1,0 +1,3 @@
+#!/bin/sh
+# プラグインの最上位に bin/ があると，Claude はそのプラグインを追加できない．ledger の記録は会話をまたいで残るプロジェクトのファイルにあり，渡すのも Claude Code の mod なので，このファイルで Claude Code 専用にする．
+echo "ledger は Claude Code 専用である．"

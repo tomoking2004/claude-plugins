@@ -1,0 +1,12 @@
+{
+  "name": "ledger",
+  "version": "0.1.0",
+  "description": "プロジェクトの中身について決めたことと確かめた事実を，承認された分だけ .ledger/ に記録し，会話の始まりに要る分だけを Claude に渡す．",
+  "author": {
+    "name": "tomoking2004"
+  },
+  "repository": "https://github.com/tomoking2004/claude-plugins",
+  "license": "MIT",
+  "keywords": ["claude-code", "skills", "mod", "context", "memory"],
+  "dependencies": ["heal@tomoking2004"]
+}
