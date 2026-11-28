@@ -1,4 +1,4 @@
-import type { AgentInfo, ModelUsage, On } from 'claude-code'
+import type { AgentInfo, ModelUsage, On, TurnUsage } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 import type { Engine, Plugin } from 'claude-code/testing'
 
@@ -133,6 +133,19 @@ const world = (on: On, usage = { tokens: 10_000 }) => {
   on('classic.PermissionRequest', () => ({}))
   on('classic.PostToolUse', () => ({}))
   on('classic.PostCompact', () => ({}))
+  on('classic.SessionStart', () => ({}))
+  // 本体と分身の要求．`step.usage` を，次の要求の使用量として返す（検査が書き換える）．
+  const step = { usage: null as TurnUsage | null }
+  on('turn.step', async function* (_, e) {
+    return {
+      turnId: e.turnId,
+      index: e.index,
+      answer: '',
+      toolUses: [],
+      stopReason: 'end_turn' as const,
+      usage: step.usage,
+    }
+  })
   on('session.usage', () => ({
     value: { startedAt: 0, context: { window: 1_000_000, tokens: usage.tokens }, rateLimits: [] },
   }))
@@ -153,8 +166,34 @@ const world = (on: On, usage = { tokens: 10_000 }) => {
     }
   })
 
-  return { clock, usage, agents, labels, pane }
+  return { clock, usage, agents, labels, pane, step }
 }
+
+/** 要求1件の使用量．`written` は寿命ごとにキャッシュへ書いた量，`read` は読んだ量． */
+const spent = (written: { '5m'?: number; '1h'?: number }, read = 0): TurnUsage => ({
+  input_tokens: 10,
+  output_tokens: 10,
+  cache_read_input_tokens: read,
+  cache_creation_input_tokens: (written['5m'] ?? 0) + (written['1h'] ?? 0),
+  ephemeral_5m_input_tokens: written['5m'] ?? 0,
+  ephemeral_1h_input_tokens: written['1h'] ?? 0,
+  model: 'claude-test',
+})
+
+/** 本体（`agentId` を渡せば分身）が要求を1件送り，応答を読み終える． */
+const request = async ($: Engine, agentId?: string) => {
+  const stream = $.turn.step({
+    turnId: 't1',
+    index: 0,
+    model: 'claude-test',
+    messageCount: 1,
+    ...(agentId === undefined ? {} : { agentId }),
+  })
+  for await (const _ of stream);
+}
+
+/** 本体が返答を終える． */
+const rest = ($: Engine) => $.classic.Stop({ stop_hook_active: false })
 
 /** パネルに並ぶ演者の，読み上げ用の文（本体か分身か：役割）と絵を返す．画面は，名指さなければ VS Code． */
 const actors = async ($: Engine, surface: 'vscode' | 'desktop' | 'mobile' = 'vscode') => {
@@ -636,6 +675,136 @@ test('絵の大きさと動かす数の上限は VS Code だけに当て，ほ�
 
   // VS Code では，入る2体にだけ絵を出す．
   expect((await actors($)).map(actor => nameOf(actor.source))).toEqual(['main-write', 'sub-write'])
+})
+
+test('本体が眠る間，パネルの下に，キャッシュが切れるまでの残りを分で書き，切れたら深く眠る', ONE, async ($, on) => {
+  const { clock, step } = world(on)
+  await start($)
+  step.usage = spent({ '5m': 100 })
+  await request($)
+  // 分身の要求は，本体のキャッシュの寿命に数えない．
+  step.usage = spent({ '1h': 100 })
+  await request($, 'a1')
+  // 働いている間は書かない．
+  expect(await captions($)).toEqual([''])
+
+  await clock.advance(30_000)
+  await rest($)
+  const ui = await $.ui.mount({ ...PANE, surface: 'vscode' })
+  const note = async () => (await ui.findAll({ type: 'Text' })).map(text => text.text).at(-1)
+  // 寿命は，返答を終えた時刻でなく，要求を送った時刻から数える．残りの分は切り上げる．
+  expect(await note()).toBe('深く眠るまで，あと5分．')
+  await clock.advance(30_000)
+  expect(await note()).toBe('深く眠るまで，あと4分．')
+  await clock.advance(3 * 60_000)
+  expect(await note()).toBe('深く眠るまで，あと1分．')
+  // 切れても行は消さず，切れたことを書く．
+  await clock.advance(60_000)
+  expect(await note()).toBe('深く眠っている．')
+  await ui.unmount()
+
+  // 話しかけると，起きるので書かない．
+  await say($, '次の依頼')
+  expect(await captions($)).toEqual([''])
+})
+
+test('眠りの深さの行は端末でも書き，見守る間と，寿命が分からないか忘れたときは書かない', ONE, async ($, on) => {
+  const { step } = world(on)
+  await start($)
+  // 要求を送る前は，寿命が分からない．
+  await rest($)
+  expect(await captions($)).toEqual([''])
+
+  step.usage = spent({ '1h': 100 })
+  await request($)
+  await rest($)
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect((await ui.findAll({ type: 'Text' })).map(text => text.text)).toEqual([
+    '本体：眠る',
+    '深く眠るまで，あと60分．',
+  ])
+  await ui.unmount()
+
+  // 裏で分身が働く間，本体は見守るので書かない．
+  await $.classic.SubagentStart({ agent_id: 'a1', agent_type: 'Explore' })
+  expect(await captions($)).toEqual(['', 'Explore'])
+
+  // 分身が終われば，本体はまた眠るので書く．
+  await $.classic.SubagentStop({
+    agent_id: 'a1',
+    agent_type: 'Explore',
+    agent_transcript_path: '/t',
+    stop_hook_active: false,
+  })
+  expect((await captions($)).at(-1)).toBe('深く眠るまで，あと60分．')
+
+  // 圧縮のあとは，前の寿命を忘れる．
+  await $.classic.PostCompact({ trigger: 'manual', compact_summary: '' })
+  expect(await captions($)).toEqual(['', 'Explore'])
+
+  // 会話の消去のあとも，前の寿命を忘れる．
+  await request($)
+  await $.classic.SessionStart({ source: 'clear' })
+  await rest($)
+  expect(await captions($)).toEqual([''])
+})
+
+test('省いた演者の断りと眠りの深さの行が両方あれば，断りを先に書く', HEAVY, async ($, on) => {
+  const { step } = world(on)
+  await start($)
+  for (const id of ['a1', 'a2', 'a3']) {
+    await $.classic.SubagentStart({ agent_id: id, agent_type: 'Explore' })
+    await $.classic.SubagentStop({
+      agent_id: id,
+      agent_type: 'Explore',
+      agent_transcript_path: '/t',
+      stop_hook_active: false,
+    })
+  }
+  step.usage = spent({ '5m': 100 })
+  await request($)
+  await rest($)
+
+  // 眠る分身の絵は2枚まで入り，3体目を省く．
+  expect((await captions($)).slice(-2)).toEqual([
+    'ほか1体は，この画面が一度に描ける量を超えるので，省いている．',
+    '深く眠るまで，あと5分．',
+  ])
+})
+
+test('キャッシュに書いた要求は，その書き込みの寿命（5分か1時間．両方なら短い方）を持つ', () => {
+  const at = 1_000
+  expect(cast.cached(null, spent({ '1h': 50 }), at)).toEqual({ at, lifetime: 60 * 60_000 })
+  expect(cast.cached(null, spent({ '5m': 50, '1h': 50 }), at)).toEqual({ at, lifetime: 5 * 60_000 })
+})
+
+test('読むだけの要求は，前と同じ長さの寿命を，その要求を送った時刻から改めて持つ', () => {
+  const at = 1_000
+  const hour = 60 * 60_000
+  expect(cast.cached({ at: 0, lifetime: hour }, spent({}, 500), at)).toEqual({ at, lifetime: hour })
+  // 前の寿命が分からなければ，分からないまま．
+  expect(cast.cached(null, spent({}, 500), at)).toBe(null)
+})
+
+test('読みも書きもしない要求と，使用量が届かない要求は，前の寿命をそのまま残す', () => {
+  const was = { at: 0, lifetime: 60 * 60_000 }
+  expect(cast.cached(was, spent({}), 1_000)).toBe(was)
+  expect(cast.cached(was, null, 1_000)).toBe(was)
+})
+
+test('書き込みの寿命を伝えない接続先では，寿命が分からない', () => {
+  const { ephemeral_5m_input_tokens: _5m, ephemeral_1h_input_tokens: _1h, ...unnamed } = spent({ '5m': 100 })
+  expect(cast.cached(null, unnamed, 1_000)).toBe(null)
+})
+
+test('キャッシュが切れるまでの残りの分と，表示が次に変わるまでの時間', () => {
+  const kept = { at: 0, lifetime: 5 * 60_000 }
+  expect([0, 1, 60_000, 299_999, 300_000, 400_000].map(now => cast.minutesLeft(kept, now))).toEqual([
+    5, 5, 4, 1, 0, 0,
+  ])
+  expect([0, 1, 60_000, 299_999, 300_000].map(now => cast.untilNextMinute(kept, now))).toEqual([
+    60_000, 59_999, 60_000, 1, undefined,
+  ])
 })
 
 test('絵の候補は，望ましい順に並ぶ', () => {

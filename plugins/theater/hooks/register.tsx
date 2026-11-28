@@ -13,6 +13,7 @@ import type { EngineInterface, Register, Timer } from 'claude-code'
 import type {
   Theater,
   TheaterActor as Actor,
+  TheaterCache as Cache,
   TheaterCast as Cast,
   TheaterCharacter as Character,
   TheaterRole as Role,
@@ -56,6 +57,8 @@ const ENDED = ['completed', 'failed', 'killed']
 const LEAD = 'lead' // `$.store` のキー：ユーザーが最後に選んだキャラクターの名前
 
 const state = atom({ plugin: 'theater', key: 'cast' } as const, cast.EMPTY, { shape: 'cast-1' })
+// 本体の要求が，プロンプトのキャッシュを最後に保った時刻と寿命．まだ分からなければ null．
+const cache = atom({ plugin: 'theater', key: 'cache' } as const, null, { shape: 'cache-1' })
 
 // ── キャラクター ─────────────────────────────────────
 
@@ -324,6 +327,33 @@ type Finished = { agent_id?: string; tool_name: string; tool_use_id: string }
 const settle = ($: EngineInterface, e: Finished) =>
   change($, was => cast.answered(was, e.agent_id ?? cast.MAIN, e.tool_name, e.tool_use_id))
 
+/** 本体が眠る間に，パネルの下に書く，キャッシュが切れるまでの残り．切れたら「深く眠っている．」． */
+const DOZING = (minutes: number) =>
+  minutes > 0 ? `深く眠るまで，あと${minutes}分．` : '深く眠っている．'
+
+let countdown: Timer | undefined
+
+/**
+ * 本体が眠る間に，パネルの下に書く1行．眠っていないか，キャッシュの寿命が分からなければ undefined．
+ * 残りの分が変わる時刻に，描き直しを仕込む．
+ */
+const dozed = async ($: EngineInterface, current: Cast): Promise<string | undefined> => {
+  countdown?.cancel()
+  countdown = undefined
+  const main = current.actors.find(actor => actor.id === cast.MAIN)
+  if (main === undefined || cast.shown(current, main) !== 'rest') return undefined
+  // 描画の中で `cache` を読むと，寿命が書き換わるたびに描き直す．そこで眠る間だけ読み，働く間は，
+  // 要求のたびに寿命が書き換わっても描き直さない．
+  const kept: Cache | null = await read($, cache)
+  if (kept === null) return undefined
+
+  const now = await $.clock.now()
+  const ms = cast.untilNextMinute(kept, now)
+  if (ms !== undefined) countdown = $.clock.after(ms, () => void $.ui.invalidate('ui.render'))
+
+  return DOZING(cast.minutesLeft(kept, now))
+}
+
 /** パネルを開く．キャラクターがまだ加わっていなければ，開かない（加わったときに開く）． */
 const open = async ($: EngineInterface) => {
   const character = lead()
@@ -460,6 +490,16 @@ export const register: Register = on => {
     return next(e)
   })
 
+  // 本体の要求ごとに，キャッシュの寿命を控える．応答はそのまま通す．
+  on('turn.step', async function* ($, e, next) {
+    if (e.agentId !== undefined) return yield* next(e)
+    const at = await $.clock.now()
+    const result = yield* next(e)
+    await update($, cache, was => cast.cached(was, result.usage, at))
+
+    return result
+  })
+
   on('classic.Stop', async ($, e, next) => {
     if (e.agent_id === undefined) {
       const [sleepy, gone] = [await drowsy($), await ended($)]
@@ -469,16 +509,21 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // 圧縮を終えたら，眠気を測り直す（量が減っていれば，減ったあとの段階へ戻る）．
+  // 圧縮を終えたら，眠気を測り直す（量が減っていれば，減ったあとの段階へ戻る）．会話が要約に置き換わり，
+  // 前の寿命は次の要求に当たらないので，忘れる．
   on('classic.PostCompact', async ($, e, next) => {
     const sleepy = await drowsy($)
     await change($, sleepy)
+    await update($, cache, () => null)
 
     return next(e)
   })
 
   on('classic.SessionStart', async ($, e, next) => {
-    if (e.source === 'clear') await change($, () => cast.EMPTY)
+    if (e.source === 'clear') {
+      await change($, () => cast.EMPTY)
+      await update($, cache, () => null)
+    }
 
     return next(e)
   })
@@ -489,6 +534,7 @@ export const register: Register = on => {
     const actors = character === undefined ? [] : cast.lined(current)
     const alt = (actor: Actor) =>
       `${actor.id === cast.MAIN ? '本体' : '分身'}：${ROLE_NAME[cast.shown(current, actor)]}`
+    const dozing = character === undefined ? undefined : await dozed($, current)
 
     // 端末は絵（SVG）を描けないので，役割と一言を文字で並べる．
     if (e.surface === 'terminal') {
@@ -499,6 +545,7 @@ export const register: Register = on => {
           {actors.map(actor => (
             <Text>{[alt(actor), cast.brief(actor.label, TERMINAL_WIDTH)].filter(Boolean).join('　')}</Text>
           ))}
+          {dozing === undefined ? [] : <Text dimColor>{dozing}</Text>}
         </Box>
       )
     }
@@ -528,12 +575,21 @@ export const register: Register = on => {
         ))}
       </Box>
     )
-    if (shown.length === actors.length) return row
+    // パネルの下の行：省いた演者の断り（絵の列の説明なので列の側に置く），眠りの深さ，の順．
+    const notes = [
+      ...(shown.length === actors.length ? [] : [OMITTED(actors.length - shown.length)]),
+      ...(dozing === undefined ? [] : [dozing]),
+    ]
+    if (notes.length === 0) return row
 
     return (
       <Box flexDirection="column" alignItems="center" gap={1}>
         {row}
-        <Text dimColor>{OMITTED(actors.length - shown.length)}</Text>
+        <Box flexDirection="column" alignItems="center">
+          {notes.map(note => (
+            <Text dimColor>{note}</Text>
+          ))}
+        </Box>
       </Box>
     )
   })

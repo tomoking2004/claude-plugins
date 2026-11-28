@@ -1,7 +1,10 @@
 // 演者たちの状態と見せ方の決まり．状態を進める関数は，受け取った状態を変えずに次の状態を返す．
 
+import type { TurnUsage } from 'claude-code'
+
 import type {
   TheaterActor as Actor,
+  TheaterCache as Cache,
   TheaterCast as Cast,
   TheaterRole as Role,
 } from '../types'
@@ -231,6 +234,41 @@ const DROWSY = [100_000, 150_000, 200_000]
 /** コンテキストのトークン数から，本体の眠気の段階を決める． */
 export const sleepinessOf = (tokens: number | undefined): number =>
   tokens === undefined ? 0 : DROWSY.filter(edge => tokens >= edge).length
+
+const MINUTE_MS = 60_000
+// キャッシュに書いた分が保たれる長さ．使用量は，書いた量をこの2つの寿命ごとに分けて伝える．
+const FIVE_MINUTES_MS = 5 * MINUTE_MS
+const ONE_HOUR_MS = 60 * MINUTE_MS
+
+/**
+ * 本体の要求1件（`at` に送った）が，キャッシュをいつまで保つか．書いたなら，その寿命（両方に書いたなら
+ * 短い方）．読むだけなら，前と同じ長さの寿命を，送った時刻から改めて持つ．使用量が届かないか，どちらもしていなければ，
+ * 前のままにする．
+ */
+export const cached = (was: Cache | null, usage: TurnUsage | null, at: number): Cache | null => {
+  if (usage === null) return was
+  const lifetime =
+    (usage.ephemeral_5m_input_tokens ?? 0) > 0
+      ? FIVE_MINUTES_MS
+      : (usage.ephemeral_1h_input_tokens ?? 0) > 0
+        ? ONE_HOUR_MS
+        : usage.cache_read_input_tokens > 0
+          ? was?.lifetime
+          : undefined
+
+  return lifetime === undefined ? was : { at, lifetime }
+}
+
+/** キャッシュが切れるまでの残り（分．切り上げる）．切れていれば0． */
+export const minutesLeft = (cache: Cache, now: number): number =>
+  Math.max(0, Math.ceil((cache.at + cache.lifetime - now) / MINUTE_MS))
+
+/** 残りの分の表示が次に変わるまでの時間（ms）．切れていれば undefined． */
+export const untilNextMinute = (cache: Cache, now: number): number | undefined => {
+  const left = cache.at + cache.lifetime - now
+
+  return left <= 0 ? undefined : left % MINUTE_MS || MINUTE_MS
+}
 
 /**
  * 絵の名前（拡張子を除く）の候補．先のものほど望ましく，キャラクターが持つ最初の絵を使う．

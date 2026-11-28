@@ -25,6 +25,9 @@ export type TheaterActor = {
 /** パネルに映る全員と，本体の眠気の段階（0〜3）． */
 export type TheaterCast = { actors: TheaterActor[]; sleepiness: number }
 
+/** 本体の要求がプロンプトのキャッシュを最後に保った時刻（`at`．要求を送った時刻）と，そこから保たれる長さ（`lifetime`．ms）． */
+export type TheaterCache = { at: number; lifetime: number }
+
 /** 絵を持ち寄るキャラクター．演者はみな，パネルに映すキャラクターの絵で映る． */
 export type TheaterCharacter = {
   /** キャラクターの名前．パネルを開くコマンドの名前（`/<name>`）にもなる． */
@@ -53,6 +56,6 @@ declare module 'claude-code' {
   }
 
   interface PluginState {
-    theater: { cast: Shaped<TheaterCast> }
+    theater: { cast: Shaped<TheaterCast>; cache: Shaped<TheaterCache | null> }
   }
 }
