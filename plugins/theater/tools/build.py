@@ -375,8 +375,8 @@ def readme_preview(out: Path, wanted: dict[str, Frames]) -> None:
 def check_preview(out: Path, wanted: dict[str, Frames]) -> None:
     """確かめ用の GIF を書き出す：全ての絵を，黒背景に6つずつ並べる．
 
-    本体の働く役割（眠気なし），分身の働く役割，本体の眠気の段階1・2・3それぞれの
-    働く役割，「眠る」の順．
+    本体の働く役割（段階0．無ければ眠気を描き分けない絵），分身の働く役割，
+    本体の眠気の段階1・2・3それぞれの働く役割，「眠る」の順．
     """
     def order(key: str) -> tuple[int, int]:
         role = key.split("-")[1]

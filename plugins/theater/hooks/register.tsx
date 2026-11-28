@@ -143,7 +143,7 @@ let handover: Timer | undefined
 /**
  * VS Code で動かす絵の位置．`wanted` は動かしたい位置，`count` は並ぶ絵の数．
  * VS Code は，動かす枠を絵の位置ごとに，頼まれた順（並び順）に裁き，枠が空いていないときに頼んだ絵を
- * 1分ほど止めたままにする．そこで，動かす位置の入れ替えは2段に分ける：前に動かした位置のうち
+ * 1分ほど止めたままにする．そこで，動かす位置の入れ替えは2回の描画に分ける：前に動かした位置のうち
  * 外すものがあれば，先に外すだけにして，入る位置は `HANDOVER_MS` 後の描画で動かす．
  */
 const movable = async (
@@ -260,7 +260,8 @@ const LABELING = [
 ].join('')
 // 返事の1行目が句点・疑問符・感嘆符で終わっていれば，一言を付けずに依頼そのものに答えたとみなす．
 const SENTENCE_END = /[。．.!?！？]$/
-const PROMPT_LIMIT = 2000 // 一言を付けるのに読ませる依頼の長さ．依頼の文を一言に使うときの長さでもある
+// 一言を付けるのにモデルへ読ませる依頼の文の長さの上限．依頼の文をそのまま一言にするときも，ここで切る．
+const PROMPT_LIMIT = 2000
 
 // 画面が依頼の文に足す段：名前に `_` か `-` を含む，属性の無いタグで囲まれている（VS Code が足す
 // `<browser_instruction>` や `<ide_opened_file>` など）．一言には使わない．
@@ -466,7 +467,7 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // 圧縮を終えたら，眠気を測り直す（量が減っていれば，減った後の段階へ戻る）．
+  // 圧縮を終えたら，眠気を測り直す（量が減っていれば，減ったあとの段階へ戻る）．
   on('classic.PostCompact', async ($, e, next) => {
     const sleepy = await drowsy($)
     await change($, sleepy)

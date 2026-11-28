@@ -1,4 +1,4 @@
-// 演者たちの状態の決まり．状態を進める関数は，受け取った状態を変えずに次の状態を返す．
+// 演者たちの状態と見せ方の決まり．状態を進める関数は，受け取った状態を変えずに次の状態を返す．
 
 import type {
   TheaterActor as Actor,
@@ -107,7 +107,7 @@ export const answered = (cast: Cast, id: string, tool: string, callId: string): 
 const labeled = (cast: Cast, id: string, label: string): Cast =>
   altered(cast, id, actor => (actor.label !== '' || label === '' ? actor : { ...actor, label }))
 
-/** 演者に新しい指示が届いた：一言を付け替える．指示の合間（ツールを使う間）には呼ばない． */
+/** 演者に新しい指示が届いた：一言を付け替える．1つの指示を進める間（ツールを使うたび）には呼ばない． */
 export const relabeled = (cast: Cast, id: string, label: string): Cast =>
   altered(cast, id, actor => (label === '' || actor.label === label ? actor : { ...actor, label }))
 

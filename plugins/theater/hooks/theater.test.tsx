@@ -40,7 +40,7 @@ const KIT: Plugin = {
     })
   },
 }
-// 絵が大きいキャラクター．「書く」の絵は3枚，「考える」の絵は7枚で，パネルに並べられる絵の大きさを超える．
+// 絵が大きいキャラクター．並べる絵の大きさの合計は，「書く」の絵なら3体，「考える」の絵なら7体で，上限を超える．
 const BIG: Plugin = {
   name: 'big',
   register(on) {
@@ -51,7 +51,7 @@ const BIG: Plugin = {
     })
   },
 }
-// 「書く」の絵が，1枚でパネルに並べられる絵の大きさを超えるキャラクター．
+// 「書く」の絵1枚だけで，並べる絵の大きさの合計の上限を超えるキャラクター．
 const VAST: Plugin = {
   name: 'vast',
   register(on) {
@@ -521,7 +521,7 @@ test('映すのは最初に加わったキャラクターで，コマンドで�
   expect((await actors($))[0]?.source).toContain('kit/sprites/main-think.svg')
 })
 
-test('持っていない絵は，本体の絵・眠気なしの絵・「考える」の絵で代える', TWO, async ($, on) => {
+test('持っていない絵は，本体の絵・眠気を描き分けない絵・「考える」の絵で代える', TWO, async ($, on) => {
   world(on, { tokens: 250_000 })
   await start($)
   await open($, 'kit')
@@ -578,7 +578,7 @@ test('絵の大きさの合計を，上限に収める', () => {
   expect(cast.fitted([100, 100], Infinity)).toEqual([true, true])
 })
 
-test('動かす絵は6体までで，本体・働く分身・眠る分身の順に取る', ONE, async ($, on) => {
+test('動かす絵は6枚までで，本体・働く分身・眠る分身の順に取る', ONE, async ($, on) => {
   const { clock } = world(on)
   await start($)
   for (const id of ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7']) {
@@ -587,7 +587,7 @@ test('動かす絵は6体までで，本体・働く分身・眠る分身の順�
   const moving = async () => (await actors($)).map(actor => actor.source.includes('animation'))
   expect(await moving()).toEqual([true, true, true, true, true, true, false, false])
 
-  // 眠った分身は止めて，働く分身を動かす．入れ替えは2段に分け，先に止めて，間を置いてから動かす．
+  // 眠った分身は止めて，働く分身を動かす．入れ替えは2回の描画に分け，先に止めて，間を置いてから動かす．
   await $.classic.SubagentStop({
     agent_id: 'a1',
     agent_type: 'Explore',
