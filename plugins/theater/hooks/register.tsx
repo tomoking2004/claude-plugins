@@ -228,7 +228,7 @@ const change = async (
   }
 
   // 控えた役割があれば，切り替えてよい時刻にもう一度見る．
-  const ms = cast.wait(after, now)
+  const ms = cast.untilFlush(after, now)
   timer?.cancel()
   timer = ms === undefined ? undefined : $.clock.after(ms + 1, () => void change($, cast.flushed))
 }
@@ -250,9 +250,9 @@ const ended = async ($: EngineInterface): Promise<string[]> =>
   (await $.agent.list()).filter(agent => ENDED.includes(agent.status)).map(agent => agent.id)
 
 // 本体の一言は，依頼が届くたびに，その文から小さなモデルに付けさせる（依頼1件につき短い呼び出しが1回）．
-const NAMER = 'haiku'
+const LABELER = 'haiku'
 const LABEL_WIDTH = 24 // モデルに付けさせる一言の幅の上限（`cast.widthOfText` の数え方）
-const NAMING = [
+const LABELING = [
   'ユーザーの依頼を受けた担当者の役割を，一言の名詞句で答える．',
   '例：「ログの調査」「README の校正」「テストの修理」．',
   `依頼と同じ言語で，全角${LABEL_WIDTH / 2}字（半角${LABEL_WIDTH}字）以内．役割だけを1行で出力し，説明・引用符・句点は付けない．`,
@@ -277,20 +277,20 @@ const FROM_USER = ['composer', 'bridge', 'sdk']
 // 分身へ追加の指示を送るツール．宛先（`to`）と，指示の要約（`summary`）を持つ．
 const MESSAGING = 'SendMessage'
 
-let namings = 0 // 一言を頼んだ回数
+let labelings = 0 // 一言を頼んだ回数
 
 /**
  * 本体の一言を付け替える．新しい一言が届くまでは，前の一言を出しておく．モデルが答えないか，一言を
  * 付けずに依頼そのものに答えたときは，依頼の文を使う．ユーザーが書いた部分が無い依頼では，付け替えない．
  */
-const name = async ($: EngineInterface, text: string): Promise<void> => {
+const relabel = async ($: EngineInterface, text: string): Promise<void> => {
   const prompt = written(text)
   if (prompt === '') return
-  const turn = ++namings
+  const turn = ++labelings
   const reply = await $.model
     .complete({
-      model: NAMER,
-      system: NAMING,
+      model: LABELER,
+      system: LABELING,
       prompt: prompt.slice(0, PROMPT_LIMIT),
       maxTokens: 40,
       timeoutMs: 15_000,
@@ -301,9 +301,9 @@ const name = async ($: EngineInterface, text: string): Promise<void> => {
   const isLabel =
     line !== '' && cast.widthOfText(line) <= LABEL_WIDTH && !SENTENCE_END.test(line)
   // 待つ間に次の依頼が届いていたら，古い答えは捨てる．
-  if (turn === namings) {
+  if (turn === labelings) {
     const text = isLabel ? line : prompt.slice(0, PROMPT_LIMIT)
-    await change($, was => cast.renamed(was, cast.MAIN, text))
+    await change($, was => cast.relabeled(was, cast.MAIN, text))
   }
 }
 
@@ -313,7 +313,7 @@ const instruct = async ($: EngineInterface, input: unknown): Promise<void> => {
   if (typeof to !== 'string' || typeof summary !== 'string') return
   // 宛先は分身の id か，起動のときに付けた呼び名．
   const id = (await $.agent.list()).find(agent => agent.id === to || agent.name === to)?.id ?? to
-  await change($, was => cast.renamed(was, id, summary))
+  await change($, was => cast.relabeled(was, id, summary))
 }
 
 type Finished = { agent_id?: string; tool_name: string; tool_use_id: string }
@@ -443,7 +443,7 @@ export const register: Register = on => {
       // 依頼の受け付けを待たせないよう，一言はあとから付ける．スラッシュコマンドの入力からは付けない．
       // 映すキャラクターがいなければ，付けない．
       if (e.command === undefined && lead() !== undefined) {
-        $.clock.after(0, () => void name($, e.text))
+        $.clock.after(0, () => void relabel($, e.text))
       }
     }
 
@@ -452,7 +452,7 @@ export const register: Register = on => {
 
   on('classic.UserPromptSubmit', async ($, e, next) => {
     const sleepy = await drowsy($)
-    await change($, (was, now) => sleepy(cast.woke(was, now)))
+    await change($, (was, now) => sleepy(cast.woken(was, now)))
 
     return next(e)
   })

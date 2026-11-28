@@ -114,14 +114,14 @@ const world = (on: On, usage = { tokens: 10_000 }) => {
   const agents: AgentInfo[] = []
   on('agent.list', () => ({ value: agents }))
   // `calls` は一言を頼まれた回数，`prompt` は最後に読まされた依頼の文．
-  const names = { text: 'README の校正', isAnswered: true, calls: 0, prompt: '' }
+  const labels = { text: 'README の校正', isAnswered: true, calls: 0, prompt: '' }
   on('model.complete', (_, e) => {
-    names.calls += 1
-    names.prompt = e.prompt
+    labels.calls += 1
+    labels.prompt = e.prompt
 
     return {
-      value: names.isAnswered
-        ? { isAnswered: true, text: names.text, usage: {} as ModelUsage }
+      value: labels.isAnswered
+        ? { isAnswered: true, text: labels.text, usage: {} as ModelUsage }
         : { isAnswered: false, reason: 'empty-reply', usage: {} as ModelUsage },
     }
   })
@@ -153,7 +153,7 @@ const world = (on: On, usage = { tokens: 10_000 }) => {
     }
   })
 
-  return { clock, usage, agents, names, pane }
+  return { clock, usage, agents, labels, pane }
 }
 
 /** パネルに並ぶ演者の，読み上げ用の文（本体か分身か：役割）と絵を返す．画面は，名指さなければ VS Code． */
@@ -269,7 +269,7 @@ test('分身は開始で列に加わり，終えても次の依頼まで列に�
 })
 
 test('絵の下の一言は，指示が届いたときだけ替わる', ONE, async ($, on) => {
-  const { agents, clock, names } = world(on)
+  const { agents, clock, labels } = world(on)
   // 一覧のうち，この検査でプラグインが読むのは id・description・name だけである．
   agents.push({ id: 'a1', description: 'リンクの確認' } as AgentInfo)
   await start($)
@@ -281,7 +281,7 @@ test('絵の下の一言は，指示が届いたときだけ替わる', ONE, asy
   expect(await captions($)).toEqual(['README の校正', 'リンクの確認'])
 
   // 知らせが届いても，ツールを使っても，一言は変わらない．
-  names.text = '表の追加'
+  labels.text = '表の追加'
   agents[0] = { id: 'a1', description: '別の仕事', name: 'checker' } as AgentInfo
   await notify($, '知らせ')
   await $.tool.call({ tool: 'Bash', command: 'ls' })
@@ -324,8 +324,8 @@ test('返答を終えた本体は，働いている分身がいれば見守り�
 })
 
 test('モデルが答えなければ，依頼の文をそのまま一言にする', ONE, async ($, on) => {
-  const { clock, names } = world(on)
-  names.isAnswered = false
+  const { clock, labels } = world(on)
+  labels.isAnswered = false
   await start($)
   await say($, '表を\n  足して')
   await clock.settle()
@@ -333,41 +333,41 @@ test('モデルが答えなければ，依頼の文をそのまま一言にす�
 })
 
 test('モデルが依頼そのものに答えたら，その返事は一言にせず，依頼の文を使う', ONE, async ($, on) => {
-  const { clock, names } = world(on)
-  names.text = 'Bashの実行環境がないため、pwdを実際に実行することはできません。ターミナルで `pwd` と入力してください。'
+  const { clock, labels } = world(on)
+  labels.text = 'Bashの実行環境がないため、pwdを実際に実行することはできません。ターミナルで `pwd` と入力してください。'
   await start($)
   await say($, 'Bash で pwd を実行して')
   await clock.settle()
   expect(await captions($)).toEqual(['Bash で pwd を実行して'])
 
   // 短くても，句点で終わる返事は捨てる．
-  names.text = '実行しました。'
+  labels.text = '実行しました。'
   await say($, 'ls を実行して')
   await clock.settle()
   expect(await captions($)).toEqual(['ls を実行して'])
 
   // 句点で終わらなくても，幅が半角24字を超える返事は捨てる．ちょうど24字なら一言にする．
-  names.text = '設計文書と実装の照合の確認'
+  labels.text = '設計文書と実装の照合の確認'
   await say($, 'もう一度')
   await clock.settle()
   expect(await captions($)).toEqual(['もう一度'])
 
-  names.text = '設計文書と実装の照合確認'
+  labels.text = '設計文書と実装の照合確認'
   await say($, 'さらにもう一度')
   await clock.settle()
   expect(await captions($)).toEqual(['設計文書と実装の照合確認'])
 })
 
 test('画面が依頼の文に足した段は，一言に使わない', ONE, async ($, on) => {
-  const { clock, names } = world(on)
+  const { clock, labels } = world(on)
   const added = '<browser_instruction># Example\n\nYou have access to example tools.</browser_instruction>'
   await start($)
   await say($, `${added}\n表を足して`)
   await clock.settle()
-  expect(names.prompt).toBe('表を足して')
+  expect(labels.prompt).toBe('表を足して')
 
   // モデルが答えないときに使う依頼の文にも，足された段は入らない．貼り付けた文は，囲むタグだけを外す．
-  names.isAnswered = false
+  labels.isAnswered = false
   await say($, `${added}\n<ide_opened_file>The user opened a file.</ide_opened_file>\n図を足して`)
   await clock.settle()
   expect(await captions($)).toEqual(['図を足して'])
@@ -376,10 +376,10 @@ test('画面が依頼の文に足した段は，一言に使わない', ONE, asy
   expect(await captions($)).toEqual(['節を足して'])
 
   // ユーザーが書いた部分が無ければ，一言を頼まず，前の一言を残す．
-  const calls = names.calls
+  const calls = labels.calls
   await say($, added)
   await clock.settle()
-  expect(names.calls).toBe(calls)
+  expect(labels.calls).toBe(calls)
   expect(await captions($)).toEqual(['節を足して'])
 })
 
@@ -489,13 +489,13 @@ test('キャラクターのコマンドは，パネルが置かれなかった�
 })
 
 test('キャラクターがいなければ，何も映さず，パネルも開かず，一言も頼まない', async ($, on) => {
-  const { clock, names, pane } = world(on)
+  const { clock, labels, pane } = world(on)
   await start($)
   await say($, 'README を直して')
   await clock.settle()
   expect(await actors($)).toEqual([])
   expect(pane.titles).toEqual([])
-  expect(names.calls).toBe(0)
+  expect(labels.calls).toBe(0)
 })
 
 test('キャラクターが加わると，その題でパネルを開く', ONE, async ($, on) => {

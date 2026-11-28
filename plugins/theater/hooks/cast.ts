@@ -48,7 +48,7 @@ const born = (id: string, now: number, label = ''): Actor => ({
 
 export const EMPTY: Cast = { actors: [born(MAIN, 0)], sleepiness: 0 }
 
-const each = (cast: Cast, id: string, change: (actor: Actor) => Actor): Cast => ({
+const altered = (cast: Cast, id: string, change: (actor: Actor) => Actor): Cast => ({
   ...cast,
   actors: cast.actors.map(actor => (actor.id === id ? change(actor) : actor)),
 })
@@ -65,7 +65,7 @@ const turned = (actor: Actor, role: Role, now: number): Actor =>
 
 /** ツールを使った．列にいない演者の分は捨てる． */
 export const used = (cast: Cast, id: string, tool: string, callId: string, now: number): Cast =>
-  each(cast, id, actor => ({
+  altered(cast, id, actor => ({
     ...turned(actor, roleOf(tool), now),
     asks: tool === ASKING ? [...actor.asks, callId] : actor.asks,
     isIdle: false,
@@ -82,7 +82,7 @@ export const flushed = (cast: Cast, now: number): Cast => ({
 })
 
 /** 控えた役割を出せるようになるまでの時間．控えが無ければ undefined． */
-export const wait = (cast: Cast, now: number): number | undefined => {
+export const untilFlush = (cast: Cast, now: number): number | undefined => {
   const left = cast.actors
     .filter(actor => actor.queued !== null)
     .map(actor => Math.max(0, actor.since + HOLD_MS - now))
@@ -92,11 +92,11 @@ export const wait = (cast: Cast, now: number): number | undefined => {
 
 /** ツールの許可を待ち始めた． */
 export const asked = (cast: Cast, id: string, tool: string): Cast =>
-  each(cast, id, actor => ({ ...actor, asks: [...actor.asks, PERMIT + tool] }))
+  altered(cast, id, actor => ({ ...actor, asks: [...actor.asks, PERMIT + tool] }))
 
 /** ツールが終わった：その呼び出しの質問の印と，同じツールの許可待ちの印を1つ外す． */
 export const answered = (cast: Cast, id: string, tool: string, callId: string): Cast =>
-  each(cast, id, actor => {
+  altered(cast, id, actor => {
     const permit = actor.asks.indexOf(PERMIT + tool)
     const asks = actor.asks.filter((mark, i) => mark !== callId && i !== permit)
 
@@ -104,17 +104,17 @@ export const answered = (cast: Cast, id: string, tool: string, callId: string): 
   })
 
 /** まだ一言の無い演者に，一言を付ける． */
-const named = (cast: Cast, id: string, label: string): Cast =>
-  each(cast, id, actor => (actor.label !== '' || label === '' ? actor : { ...actor, label }))
+const labeled = (cast: Cast, id: string, label: string): Cast =>
+  altered(cast, id, actor => (actor.label !== '' || label === '' ? actor : { ...actor, label }))
 
 /** 演者に新しい指示が届いた：一言を付け替える．指示の合間（ツールを使う間）には呼ばない． */
-export const renamed = (cast: Cast, id: string, label: string): Cast =>
-  each(cast, id, actor => (label === '' || actor.label === label ? actor : { ...actor, label }))
+export const relabeled = (cast: Cast, id: string, label: string): Cast =>
+  altered(cast, id, actor => (label === '' || actor.label === label ? actor : { ...actor, label }))
 
 /** 分身が加わった．既にいるなら，一言がまだ無いときだけ書き足す． */
 export const joined = (cast: Cast, id: string, now: number, label = ''): Cast =>
   has(cast, id)
-    ? named(cast, id, label)
+    ? labeled(cast, id, label)
     : { ...cast, actors: [...cast.actors, born(id, now, label)] }
 
 const done = (actor: Actor): Actor =>
@@ -122,7 +122,7 @@ const done = (actor: Actor): Actor =>
 
 /** 分身が仕事を終えた．すぐには外さず，眠る姿で列に残す． */
 export const finished = (cast: Cast, id: string): Cast =>
-  id === MAIN ? cast : each(cast, id, done)
+  id === MAIN ? cast : altered(cast, id, done)
 
 /** ユーザーが次の依頼を送った：終えた分身を列から外す． */
 export const tidied = (cast: Cast): Cast =>
@@ -131,8 +131,8 @@ export const tidied = (cast: Cast): Cast =>
     : cast
 
 /** 本体が動き出した：すぐ「考える」に戻す． */
-export const woke = (cast: Cast, now: number): Cast =>
-  each(cast, MAIN, actor => ({
+export const woken = (cast: Cast, now: number): Cast =>
+  altered(cast, MAIN, actor => ({
     ...actor,
     role: 'think',
     since: now,
@@ -143,7 +143,7 @@ export const woke = (cast: Cast, now: number): Cast =>
 
 /** 本体が返答を終えた． */
 export const stopped = (cast: Cast): Cast =>
-  each(cast, MAIN, actor => ({ ...actor, queued: null, asks: [], isIdle: true }))
+  altered(cast, MAIN, actor => ({ ...actor, queued: null, asks: [], isIdle: true }))
 
 /** 終了の出来事を取りこぼした分身（`ended`）と，長く動いていない分身を，終えた扱いにする． */
 export const swept = (cast: Cast, ended: readonly string[], now: number): Cast => ({
